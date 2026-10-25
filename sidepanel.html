@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Bookmarks</title>
+<link rel="stylesheet" href="sidepanel.css">
+</head>
+<body class="list">
+<header>
+  <button id="menu" title="ブックマーク"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+  <button id="back" title="戻る" disabled><svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
+  <button id="fwd" title="進む" disabled><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
+  <button id="reload" title="再読み込み" disabled><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 2.5v3h-3"/></svg></button>
+  <span id="title"></span>
+  <button id="popout" title="タブで開く" disabled><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
+</header>
+<div id="progress"></div>
+<main>
+  <iframe id="frame" allow="autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
+  <nav id="list">
+    <input id="q" type="search" placeholder="ブックマークを検索" autocomplete="off" spellcheck="false">
+    <div id="tree"></div>
+  </nav>
+</main>
+<script type="module" src="sidepanel.js"></script>
+</body>
+</html>
