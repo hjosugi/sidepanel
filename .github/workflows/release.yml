@@ -20,6 +20,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: npm run test:unit
       - name: Check version against tag
         run: |
           node -e '
@@ -36,3 +37,12 @@ jobs:
         run: gh release create "$GITHUB_REF_NAME" dist/*.zip --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Runs only after the store item exists and CWS_EXTENSION_ID is set (store/README.md).
+  store:
+    needs: release
+    if: vars.CWS_EXTENSION_ID != ''
+    uses: ./.github/workflows/store.yml
+    with:
+      tag: ${{ github.ref_name }}
+    secrets: inherit

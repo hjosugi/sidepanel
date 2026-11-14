@@ -1,30 +1,12 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { deflateRawSync } from 'node:zlib';
+import { PACKAGE_FILES } from './package-files.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8'));
 const target = join(root, 'dist', `sidepanel-bookmarks-${manifest.version}.zip`);
-const entries = [
-  'manifest.json',
-  'background.js',
-  'sidepanel.html',
-  'sidepanel.css',
-  'sidepanel.js',
-  'store.js',
-  'i18n.js',
-  'rules.js',
-  'viewer.js',
-  'bookmarks.js',
-  'cookies.js',
-  'tracker.js',
-  'spa.js',
-  'ua.js',
-  'cookie-shim.js',
-  'icons',
-  'LICENSE',
-  'README.md',
-];
+const entries = PACKAGE_FILES;
 
 function walk(file) {
   const full = join(root, file);

@@ -18,7 +18,10 @@ function check(name, ok, detail = '') {
 }
 
 const server = await startServer();
-const brave = await launchBrave(new URL('..', import.meta.url).pathname);
+// EXTENSION_DIR で展開済みの配布 zip を検証できる（CI はこちらを使う）
+const brave = await launchBrave(
+  process.env.EXTENSION_DIR ?? new URL('..', import.meta.url).pathname,
+);
 let panel;
 let launcherPage;
 const errors = [];
@@ -267,6 +270,57 @@ try {
     switched && (await logs()).logs.filter((entry) => entry.path === '/page-b').length === 1,
   );
 
+  // #11 back moves the visible page. history.back() walks the panel's joint session
+  // history, so it would undo B's later pushState and leave the visible page A unchanged.
+  await openBookmark(`${server.base}/spa`);
+  await waitFor(async () => (await title()) === 'SPA Next', { timeout: 5000 }).catch(() => {});
+  await addBookmark(`${base2}/spa`, 'SPA 2');
+  await openBookmark(`${base2}/spa`);
+  await waitFor(async () => (await title()) === 'SPA Next', { timeout: 5000 }).catch(() => {});
+  await panel.evaluate(`[...document.querySelectorAll('#tabs button')]
+    .find((item) => item.title.startsWith(${JSON.stringify(server.base)})).click()`);
+  await sleep(200);
+  await panel.evaluate('document.getElementById("back").click()');
+  await waitFor(
+    async () =>
+      new URL(await panel.evaluate('document.getElementById("title").title')).pathname === '/spa',
+    { timeout: 3000 },
+  ).catch(() => {});
+  const visibleAfterBack = await panel.evaluate('document.getElementById("title").title');
+  check(
+    '#11 back moves the visible page',
+    new URL(visibleAfterBack).pathname === '/spa',
+    visibleAfterBack,
+  );
+
+  // options page: page limit applies to the open panel
+  const optionsTab = await newTab(brave.port, `chrome-extension://${id}/options.html`);
+  const optionsTarget = await waitFor(async () => {
+    const target = (await listTargets(brave.port)).find((item) => item.id === optionsTab.id);
+    return target?.webSocketDebuggerUrl ? target : null;
+  });
+  const options = await Cdp.connect(optionsTarget.webSocketDebuggerUrl);
+  await waitFor(() => options.evaluate('document.getElementById("pages").options.length === 5'));
+  await options.evaluate(`(() => {
+    const pages = document.getElementById('pages');
+    pages.value = '1';
+    pages.dispatchEvent(new Event('change'));
+  })()`);
+  await sleep(500);
+  check(
+    'options: lowering the page limit closes older pages',
+    (await panel.evaluate("document.querySelectorAll('#frames iframe').length")) === 1 &&
+      (await panel.evaluate('document.getElementById("tabs").hidden')),
+  );
+  await options.evaluate(`(() => {
+    const pages = document.getElementById('pages');
+    pages.value = '3';
+    pages.dispatchEvent(new Event('change'));
+  })()`);
+  await sleep(300);
+  options.close();
+  await closeTarget(brave.port, optionsTab.id);
+
   // #16 cookie shim
   const cookieTab = await newTab(brave.port, `${server.base}/cookie-set`);
   await sleep(700);
@@ -472,6 +526,39 @@ try {
   );
 
   check('no uncaught errors in the side panel', errors.length === 0, errors.join(' | '));
+
+  // #7 rules and content scripts only exist while a panel is open
+  const worker = (await listTargets(brave.port)).find(
+    (target) =>
+      target.type === 'service_worker' && target.url === `chrome-extension://${id}/background.js`,
+  );
+  const sw = await Cdp.connect(worker.webSocketDebuggerUrl);
+  const panelState = () =>
+    sw.evaluate(`Promise.all([
+      chrome.declarativeNetRequest.getSessionRules(),
+      chrome.scripting.getRegisteredContentScripts(),
+    ]).then(([rules, scripts]) => ({ rules: rules.length, scripts: scripts.length }))`);
+  const whileOpen = await panelState();
+  panel.close();
+  panel = null;
+  await closeTarget(brave.port, panelTarget.id);
+  await waitFor(
+    async () => {
+      const state = await panelState();
+      return state.rules === 0 && state.scripts === 0;
+    },
+    { timeout: 5000 },
+  ).catch(() => {});
+  const afterClose = await panelState();
+  check(
+    '#7 rules and content scripts are removed when the panel closes',
+    whileOpen.rules > 0 &&
+      whileOpen.scripts > 0 &&
+      afterClose.rules === 0 &&
+      afterClose.scripts === 0,
+    JSON.stringify({ whileOpen, afterClose }),
+  );
+  sw.close();
 } catch (error) {
   console.error('TEST ERROR', error);
   const targets = await listTargets(brave.port).catch(() => []);

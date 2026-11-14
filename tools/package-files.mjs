@@ -1,0 +1,28 @@
+// 配布 zip に入れるファイル。開発用のファイル（tools/ や test/）は入れない。
+// lint はここに載っているファイルだけで参照が解決できることを確かめる。
+export const PACKAGE_FILES = [
+  'manifest.json',
+  '_locales',
+  'icons',
+  'background.js',
+  'rules.js',
+  'store.js',
+  'i18n.js',
+  'sidepanel.html',
+  'sidepanel.css',
+  'sidepanel.js',
+  'viewer.js',
+  'bookmarks.js',
+  'cookies.js',
+  'embedding.js',
+  'net.js',
+  'options.html',
+  'options.css',
+  'options.js',
+  'tracker.js',
+  'spa.js',
+  'ua.js',
+  'cookie-shim.js',
+  'LICENSE',
+  'README.md',
+];
