@@ -1,6 +1,6 @@
 {
   "name": "sidepanel-bookmarks",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "description": "Bookmarks in the Chrome side panel, with sites opened inside the panel.",
@@ -9,7 +9,9 @@
     "format": "biome check --write .",
     "test": "node tools/smoke-test.mjs",
     "compat": "node tools/compat-check.mjs",
-    "zip": "node tools/zip.mjs"
+    "zip": "node tools/zip.mjs",
+    "test:unit": "node --test test/*.test.mjs",
+    "screenshots": "node tools/screenshots.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7"

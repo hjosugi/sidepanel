@@ -203,8 +203,17 @@ iframe[hidden] {
 body.list #list {
   display: flex;
 }
+#search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 8px 8px;
+}
 #q {
-  margin: 8px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;

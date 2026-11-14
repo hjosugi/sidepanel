@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Sidepanel Bookmarks",
-  "version": "1.1.0",
-  "description": "Keep your bookmarks in the Chrome side panel and open them right there. Lightweight, no build step.",
+  "version": "1.2.0",
+  "description": "__MSG_appDesc__",
+  "default_locale": "en",
+  "homepage_url": "https://github.com/hjosugi/sidepanel",
   "minimum_chrome_version": "128",
   "permissions": [
     "sidePanel",
@@ -17,6 +19,7 @@
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background.js", "type": "module" },
   "side_panel": { "default_path": "sidepanel.html" },
+  "options_ui": { "page": "options.html", "open_in_tab": false },
   "action": {
     "default_title": "Sidepanel Bookmarks",
     "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
@@ -24,7 +27,7 @@
   "commands": {
     "toggle-list": {
       "suggested_key": { "default": "Alt+Shift+B" },
-      "description": "Toggle the bookmark list"
+      "description": "__MSG_toggleList__"
     }
   },
   "icons": {

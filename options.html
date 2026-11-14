@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title data-i18n="options.title">Sidepanel Bookmarks settings</title>
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <h1 data-i18n="options.title"></h1>
+
+  <div class="row">
+    <label for="lang" data-i18n="options.lang"></label>
+    <select id="lang">
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="mobile" data-i18n="options.mobile"></label>
+    <input id="mobile" type="checkbox" aria-describedby="mobile-hint">
+  </div>
+  <p id="mobile-hint" class="hint" data-i18n="options.mobile.hint"></p>
+
+  <div class="row">
+    <label for="pages" data-i18n="options.pages"></label>
+    <select id="pages" aria-describedby="pages-hint"></select>
+  </div>
+  <p id="pages-hint" class="hint" data-i18n="options.pages.hint"></p>
+
+  <h2 id="desktop-heading" data-i18n="options.desktop"></h2>
+  <ul id="desktop" aria-labelledby="desktop-heading"></ul>
+  <p id="desktop-empty" class="hint" data-i18n="options.desktop.empty" hidden></p>
+
+  <p id="status" role="status" aria-live="polite"></p>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

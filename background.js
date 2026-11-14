@@ -1,70 +1,70 @@
-import { applyRules } from './rules.js';
+import { applyRules, clearRules, RULE_IDS } from './rules.js';
 import { getSettings } from './store.js';
 
 const SCRIPT_IDS = ['tracker', 'spa', 'ua', 'cookie'];
 
-chrome.runtime.onInstalled.addListener(() => {
+function enableActionClick() {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-});
+}
+chrome.runtime.onInstalled.addListener(enableActionClick);
+chrome.runtime.onStartup.addListener(enableActionClick);
 
-chrome.runtime.onStartup.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
-});
+function contentScript(id, file, world, extra = {}) {
+  return {
+    id,
+    js: [file],
+    matches: ['<all_urls>'],
+    allFrames: true,
+    runAt: 'document_start',
+    world,
+    persistAcrossSessions: false,
+    ...extra,
+  };
+}
 
-async function registerContentScripts(settings) {
-  await chrome.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
-
+// すべてのスクリプトは location.ancestorOrigins を見て、パネル直下のフレーム以外では何もしない。
+function contentScripts(settings) {
   const scripts = [
-    {
-      id: 'tracker',
-      js: ['tracker.js'],
-      matches: ['<all_urls>'],
-      allFrames: true,
-      runAt: 'document_start',
-      world: 'ISOLATED',
-      persistAcrossSessions: false,
-    },
-    {
-      id: 'spa',
-      js: ['spa.js'],
-      matches: ['<all_urls>'],
-      allFrames: true,
-      runAt: 'document_start',
-      world: 'MAIN',
-      persistAcrossSessions: false,
-    },
-    {
-      id: 'cookie',
-      js: ['cookie-shim.js'],
-      matches: ['<all_urls>'],
-      allFrames: true,
-      runAt: 'document_start',
-      world: 'MAIN',
-      persistAcrossSessions: false,
-    },
+    contentScript('tracker', 'tracker.js', 'ISOLATED'),
+    contentScript('spa', 'spa.js', 'MAIN'),
+    contentScript('cookie', 'cookie-shim.js', 'MAIN'),
   ];
-
   if (settings.mobileUA) {
-    const excludeMatches = settings.desktopHosts
-      .filter((host) => /^[a-z0-9.-]+$/i.test(host))
-      .flatMap((host) => [`*://${host}/*`, `*://*.${host}/*`]);
-    scripts.push({
-      id: 'ua',
-      js: ['ua.js'],
-      matches: ['<all_urls>'],
-      ...(excludeMatches.length ? { excludeMatches } : {}),
-      allFrames: true,
-      runAt: 'document_start',
-      world: 'MAIN',
-      persistAcrossSessions: false,
-    });
+    const excludeMatches = settings.desktopHosts.flatMap((host) => [
+      `*://${host}/*`,
+      `*://*.${host}/*`,
+    ]);
+    scripts.push(
+      contentScript('ua', 'ua.js', 'MAIN', excludeMatches.length ? { excludeMatches } : {}),
+    );
   }
+  return scripts;
+}
 
+async function unregisterContentScripts() {
+  await chrome.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
+}
+
+async function enable() {
+  const settings = await getSettings();
+  await applyRules(settings);
+  await unregisterContentScripts();
   try {
-    await chrome.scripting.registerContentScripts(scripts);
+    await chrome.scripting.registerContentScripts(contentScripts(settings));
   } catch (error) {
     console.warn('Failed to register content scripts', error);
   }
+  return settings;
+}
+
+async function disable() {
+  await clearRules().catch(() => {});
+  await unregisterContentScripts();
+}
+
+async function isEnabled() {
+  const rules = await chrome.declarativeNetRequest.getSessionRules().catch(() => []);
+  return rules.some((rule) => RULE_IDS.includes(rule.id));
 }
 
 let queue = Promise.resolve();
@@ -75,31 +75,40 @@ function serialize(task) {
   return run;
 }
 
-async function prepare() {
-  const settings = await getSettings();
-  await applyRules(settings);
-  await registerContentScripts(settings);
-  return settings;
+function reply(promise, sendResponse) {
+  promise
+    .then((settings) => sendResponse({ ok: true, settings }))
+    .catch((error) => sendResponse({ ok: false, error: String(error) }));
+  return true;
 }
 
+// #7: ルールとスクリプトはパネルが開いている間だけ有効にする。
+// パネルは名前付きポートで接続し続ける。Service Worker が止まると切断されるが、
+// パネルがすぐ再接続するので、切断が「最後のパネルが閉じた」ことを意味するのは
+// Service Worker が生きている場合だけになる。
+const panels = new Set();
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'panel') return;
+  panels.add(port);
+  port.onDisconnect.addListener(() => {
+    panels.delete(port);
+    if (panels.size) return;
+    serialize(async () => {
+      if (!panels.size) await disable();
+    });
+  });
+});
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === 'prepare') {
-    serialize(prepare)
-      .then((settings) => sendResponse({ ok: true, settings }))
-      .catch((error) => sendResponse({ ok: false, error: String(error) }));
-    return true;
-  }
+  if (message?.type === 'prepare') return reply(serialize(enable), sendResponse);
 
   if (message?.type === 'settings-changed') {
-    serialize(async () => {
-      const settings = await getSettings();
-      await applyRules(settings);
-      await registerContentScripts(settings);
-      return settings;
-    })
-      .then((settings) => sendResponse({ ok: true, settings }))
-      .catch((error) => sendResponse({ ok: false, error: String(error) }));
-    return true;
+    // オプションページからの変更は、パネルが開いているときだけルールに反映する
+    return reply(
+      serialize(async () => ((await isEnabled()) ? enable() : getSettings())),
+      sendResponse,
+    );
   }
 
   return false;
@@ -114,9 +123,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   } catch {
     // パネルを開けない環境でも、開いているパネルには通知する
   }
-  try {
-    await chrome.runtime.sendMessage({ type: 'toggle-list', windowId });
-  } catch {
+  chrome.runtime.sendMessage({ type: 'toggle-list', windowId }).catch(() => {
     // パネルが開いていない
-  }
+  });
 });

@@ -33,6 +33,19 @@ const MESSAGES = {
     'page.untitled': 'Untitled',
     'list.open': 'Bookmark list',
     'list.close': 'Close bookmark list',
+    'settings.label': 'Settings',
+    'options.title': 'Sidepanel Bookmarks settings',
+    'options.lang': 'Language',
+    'options.mobile': 'Use mobile layout in the side panel',
+    'options.mobile.hint':
+      'Sends a mobile user agent so sites fit the narrow panel. Switch single sites with the phone/desktop button in the panel.',
+    'options.pages': 'Pages kept open',
+    'options.pages.hint':
+      'Older pages are closed first when you open more. 1 uses the least memory.',
+    'options.desktop': 'Sites shown in desktop layout',
+    'options.desktop.empty': 'None',
+    'options.remove': 'Remove {host}',
+    'options.saved': 'Saved',
   },
   ja: {
     'app.name': 'Sidepanel Bookmarks',
@@ -65,6 +78,18 @@ const MESSAGES = {
     'page.untitled': '無題',
     'list.open': 'ブックマーク一覧を開く',
     'list.close': 'ブックマーク一覧を閉じる',
+    'settings.label': '設定',
+    'options.title': 'Sidepanel Bookmarks の設定',
+    'options.lang': '言語',
+    'options.mobile': 'サイドパネルでモバイル表示を使う',
+    'options.mobile.hint':
+      'モバイルの User-Agent を送り、狭いパネルに合った表示にします。サイトごとの切替はパネルのスマホ/PC ボタンで行えます。',
+    'options.pages': '保持するページ数',
+    'options.pages.hint': '上限を超えると古いページから閉じます。1 にすると最も軽くなります。',
+    'options.desktop': 'デスクトップ表示にするサイト',
+    'options.desktop.empty': 'なし',
+    'options.remove': '{host} を削除',
+    'options.saved': '保存しました',
   },
 };
 

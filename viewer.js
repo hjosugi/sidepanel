@@ -1,6 +1,7 @@
 import { createCookieBridge } from './cookies.js';
 import { getLang, LANGS, setLang, t } from './i18n.js';
-import { setSettings, writeLocal } from './store.js';
+import { watchPanelFrames } from './net.js';
+import { normalizeSettings, setSettings, writeLocal } from './store.js';
 
 const LOGIN_HOSTS = [
   'accounts.google.com',
@@ -95,8 +96,8 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     fwd.disabled = !page?.canGoForward;
     reload.disabled = !page;
     popout.disabled = !page;
-    ua.hidden = !page;
-    ua.disabled = !page;
+    ua.hidden = !page || !settings.mobileUA;
+    ua.disabled = ua.hidden;
     if (page) {
       const desktop = isDesktopHost(hostOf(page.url));
       ua.dataset.mode = desktop ? 'desktop' : 'mobile';
@@ -181,18 +182,17 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     updateTabs();
   }
 
-  function ensureCapacity() {
-    while (pages.size >= Math.max(1, settings.maxPages)) {
-      const candidates = [...pages.values()].filter((page) => page.id !== activeId);
-      const pool = candidates.length ? candidates : [...pages.values()];
-      const victim = pool.sort((a, b) => a.lastUsed - b.lastUsed)[0];
-      if (!victim) break;
-      evict(victim);
+  // 表示中のページは、他に候補がない場合（上限 1 で新しいページを開くとき）だけ破棄する。
+  function trimPages(limit) {
+    while (pages.size > limit) {
+      const others = [...pages.values()].filter((page) => page.id !== activeId);
+      const pool = others.length ? others : [...pages.values()];
+      evict(pool.sort((a, b) => a.lastUsed - b.lastUsed)[0]);
     }
   }
 
   function createPage() {
-    ensureCapacity();
+    trimPages(settings.maxPages - 1);
     const iframe = document.createElement('iframe');
     iframe.allow = ALLOW;
     iframe.title = t('app.name');
@@ -325,14 +325,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   function command(name) {
     const page = active();
     if (!page) return;
-    try {
-      page.iframe.contentWindow.postMessage(
-        { __sidepanel: 1, type: 'command', command: name },
-        '*',
-      );
-    } catch {
-      // コンテンツスクリプトがまだ動いていない
-    }
+    postToPage(page, { type: 'command', command: name });
   }
 
   function reloadActive() {
@@ -398,104 +391,39 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     return [...pages.values()].find((page) => page.url === url || page.failedUrl === url) ?? null;
   }
 
-  function responseBlocksEmbedding(details) {
-    const headers = details.responseHeaders ?? [];
-    let frameOrigin;
-    let parentOrigin;
+  function postToPage(page, message) {
     try {
-      frameOrigin = new URL(details.url).origin;
-      parentOrigin =
-        details.initiator && details.initiator !== 'null'
-          ? new URL(details.initiator).origin
-          : null;
+      page.iframe.contentWindow.postMessage({ __sidepanel: 1, ...message }, '*');
     } catch {
-      return false;
+      // フレームがまだない
     }
-
-    for (const header of headers) {
-      const name = header.name.toLowerCase();
-      const value = (header.value ?? '').trim();
-      if (name === 'x-frame-options') {
-        const options = value.split(',').map((part) => part.trim().toLowerCase());
-        if (options.includes('deny')) return true;
-        if (options.includes('sameorigin') && (!parentOrigin || parentOrigin !== frameOrigin))
-          return true;
-      }
-      if (name === 'content-security-policy' || name === 'content-security-policy-report-only') {
-        const match = value.match(/(?:^|;\s*)frame-ancestors\s+([^;]+)/i);
-        if (!match) continue;
-        const sources = match[1].trim().toLowerCase().split(/\s+/);
-        if (sources.includes("'none'")) return true;
-        if (sources.includes('*')) continue;
-        const allowed = sources.some((source) => {
-          if (source === "'self'") return parentOrigin === frameOrigin;
-          if (source === 'https:') return parentOrigin?.startsWith('https:');
-          if (source === 'http:') return parentOrigin?.startsWith('http:');
-          try {
-            const url = new URL(source.includes('://') ? source : `https://${source}`);
-            if (!parentOrigin) return false;
-            const parent = new URL(parentOrigin);
-            if (url.origin === parent.origin) return true;
-            if (url.hostname.startsWith('*.')) {
-              return (
-                parent.protocol === url.protocol && parent.hostname.endsWith(url.hostname.slice(1))
-              );
-            }
-            return false;
-          } catch {
-            return false;
-          }
-        });
-        if (!allowed) return true;
-      }
-    }
-    return false;
   }
 
-  chrome.webRequest.onHeadersReceived.addListener(
-    (details) => {
-      if (details.parentFrameId === 0 || !responseBlocksEmbedding(details)) return;
-      for (const page of pages.values()) {
-        try {
-          page.iframe.contentWindow.postMessage(
-            { __sidepanel: 1, type: 'nested-blocked', url: details.url },
-            '*',
-          );
-        } catch {
-          // フレームがまだない
-        }
-      }
+  watchPanelFrames({
+    onNestedBlocked(url) {
+      for (const page of pages.values()) postToPage(page, { type: 'nested-blocked', url });
     },
-    { urls: ['<all_urls>'], types: ['sub_frame'], tabId: chrome.tabs.TAB_ID_NONE },
-    ['responseHeaders'],
-  );
-
-  chrome.webRequest.onCompleted.addListener(
-    (details) => {
-      if (details.parentFrameId !== 0 || details.statusCode < 400) return;
-      const page = pageForUrl(details.url);
+    onHttpError(url, status) {
+      const page = pageForUrl(url);
       if (!page) return;
-      page.failedUrl = details.url;
-      page.url = details.url;
-      setNotice(page, 'http', { status: details.statusCode });
+      page.failedUrl = url;
+      page.url = url;
+      setNotice(page, 'http', { status });
       if (page === active()) setBusy(false);
     },
-    { urls: ['<all_urls>'], types: ['sub_frame'], tabId: chrome.tabs.TAB_ID_NONE },
-  );
-
-  chrome.webRequest.onErrorOccurred.addListener(
-    (details) => {
-      if (details.parentFrameId !== 0) return;
-      const page = pageForUrl(details.url);
+    onNetworkError(url) {
+      const page = pageForUrl(url);
       if (!page) return;
-      page.failedUrl = details.url;
+      page.failedUrl = url;
       setNotice(page, 'error');
       if (page === active()) setBusy(false);
     },
-    { urls: ['<all_urls>'], types: ['sub_frame'], tabId: chrome.tabs.TAB_ID_NONE },
-  );
+  });
 
   menu.addEventListener('click', toggleList);
+  document
+    .getElementById('settings')
+    .addEventListener('click', () => chrome.runtime.openOptionsPage().catch(() => {}));
   back.addEventListener('click', () => command('back'));
   fwd.addEventListener('click', () => command('forward'));
   reload.addEventListener('click', reloadActive);
@@ -525,6 +453,20 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     await chrome.runtime.sendMessage({ type: 'settings-changed' }).catch(() => {});
     updateToolbar();
     reloadActive();
+  });
+
+  // オプションページや別ウィンドウのパネルで変わった設定を反映する
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.settings) return;
+    settings = normalizeSettings(changes.settings.newValue);
+    if (settings.lang && settings.lang !== getLang()) {
+      setLang(settings.lang);
+      onLanguageChange?.();
+    }
+    trimPages(settings.maxPages);
+    updateToolbar();
+    updateNotice();
+    updateTabs();
   });
 
   langButton.addEventListener('click', async () => {

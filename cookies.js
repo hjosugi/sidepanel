@@ -7,23 +7,103 @@ function safePath(path) {
   return path.split(/[?#]/)[0] || '/';
 }
 
-function originUrl(base, path) {
+function httpOrigin(value) {
   try {
-    const url = new URL(base);
-    if (!/^https?:$/.test(url.protocol)) return null;
-    url.pathname = safePath(path);
-    url.search = '';
-    url.hash = '';
-    return url;
+    const url = new URL(value);
+    return /^https?:$/.test(url.protocol) ? url.origin : null;
   } catch {
     return null;
   }
 }
 
+/**
+ * document.cookie に書かれた文字列を chrome.cookies の操作に変換する。
+ * フレーム自身のホスト（とその親ドメイン）以外への書き込みは null を返す。
+ *
+ * @param {string} base 書き込んだ文書の URL（origin はブラウザが保証した値を使う）
+ * @param {string} cookieString
+ * @param {number} [now] ミリ秒
+ * @returns {{ remove: { url: string, name: string } } | { set: chrome.cookies.SetDetails } | null}
+ */
+export function parseCookieWrite(base, cookieString, now = Date.now()) {
+  let target;
+  try {
+    target = new URL(base);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(target.protocol)) return null;
+
+  const parts = String(cookieString).split(';');
+  const pair = parts.shift()?.trim() ?? '';
+  const eq = pair.indexOf('=');
+  if (eq <= 0) return null;
+  const name = pair.slice(0, eq).trim();
+  const value = pair.slice(eq + 1).trim();
+  if (!name) return null;
+
+  const attributes = new Map();
+  for (const part of parts) {
+    const index = part.indexOf('=');
+    if (index === -1) attributes.set(part.trim().toLowerCase(), '');
+    else attributes.set(part.slice(0, index).trim().toLowerCase(), part.slice(index + 1).trim());
+  }
+
+  const host = target.hostname;
+  let domain;
+  if (attributes.has('domain')) {
+    const candidate = attributes.get('domain').replace(/^\./, '').toLowerCase();
+    if (host !== candidate && !host.endsWith(`.${candidate}`)) return null;
+    domain = candidate;
+  }
+
+  const defaultPath = target.pathname.replace(/\/[^/]*$/, '/') || '/';
+  const path = attributes.has('path') ? safePath(attributes.get('path')) : defaultPath;
+  const url = `${target.origin}${path}`;
+
+  let expired = false;
+  let expirationDate;
+  if (attributes.has('max-age')) {
+    const maxAge = Number.parseInt(attributes.get('max-age'), 10);
+    if (Number.isFinite(maxAge)) {
+      if (maxAge <= 0) expired = true;
+      else expirationDate = now / 1000 + maxAge;
+    }
+  }
+  if (attributes.has('expires') && !expirationDate) {
+    const expires = Date.parse(attributes.get('expires'));
+    if (Number.isFinite(expires)) {
+      if (expires <= now) expired = true;
+      else expirationDate = expires / 1000;
+    }
+  }
+  if (expired) return { remove: { url, name } };
+
+  const sameSiteRaw = (attributes.get('samesite') ?? '').toLowerCase();
+  let sameSite = 'lax';
+  if (sameSiteRaw === 'none') sameSite = 'no_restriction';
+  else if (sameSiteRaw === 'strict') sameSite = 'strict';
+  // ブラウザと同じく、Secure なしの SameSite=None は捨てる
+  if (sameSite === 'no_restriction' && !attributes.has('secure')) return null;
+
+  return {
+    set: {
+      url,
+      name,
+      value,
+      path,
+      secure: attributes.has('secure'),
+      sameSite,
+      ...(domain ? { domain } : {}),
+      ...(expirationDate ? { expirationDate } : {}),
+    },
+  };
+}
+
 export function createCookieBridge({ getPages }) {
   function sendJar(page, url = page.url) {
-    const target = originUrl(url, '/');
-    if (!target || !page?.iframe?.contentWindow) return;
+    const origin = httpOrigin(url);
+    if (!origin || !page?.iframe?.contentWindow) return;
     chrome.cookies
       .getAll({ url })
       .then((all) => {
@@ -32,7 +112,7 @@ export function createCookieBridge({ getPages }) {
           .map((cookie) => [cookie.name, cookie.value]);
         page.iframe.contentWindow.postMessage(
           { __sidepanel: 1, type: 'cookies:jar', cookies },
-          target.origin,
+          origin,
         );
       })
       .catch(() => {});
@@ -48,86 +128,15 @@ export function createCookieBridge({ getPages }) {
     timer = setTimeout(pushAll, 50);
   });
 
-  async function setFromString(base, cookieString) {
-    let target;
-    try {
-      target = new URL(base);
-    } catch {
-      return;
-    }
-    if (!/^https?:$/.test(target.protocol)) return;
-
-    const parts = String(cookieString).split(';');
-    const pair = parts.shift()?.trim() ?? '';
-    const eq = pair.indexOf('=');
-    if (eq <= 0) return;
-    const name = pair.slice(0, eq).trim();
-    const value = pair.slice(eq + 1).trim();
-    if (!name) return;
-
-    const attributes = new Map();
-    for (const part of parts) {
-      const index = part.indexOf('=');
-      if (index === -1) attributes.set(part.trim().toLowerCase(), '');
-      else attributes.set(part.slice(0, index).trim().toLowerCase(), part.slice(index + 1).trim());
-    }
-
-    const host = target.hostname;
-    let domain;
-    if (attributes.has('domain')) {
-      const candidate = attributes.get('domain').replace(/^\./, '').toLowerCase();
-      if (host !== candidate && !host.endsWith(`.${candidate}`)) return;
-      domain = candidate;
-    }
-
-    const defaultPath = target.pathname.replace(/\/[^/]*$/, '/') || '/';
-    const path = attributes.has('path') ? safePath(attributes.get('path')) : defaultPath;
-    const url = `${target.origin}${path}`;
-
-    let remove = false;
-    let expirationDate;
-    if (attributes.has('max-age')) {
-      const maxAge = Number.parseInt(attributes.get('max-age'), 10);
-      if (Number.isFinite(maxAge)) {
-        if (maxAge <= 0) remove = true;
-        else expirationDate = Date.now() / 1000 + maxAge;
-      }
-    }
-    if (attributes.has('expires')) {
-      const expires = Date.parse(attributes.get('expires'));
-      if (Number.isFinite(expires)) {
-        if (expires <= Date.now()) remove = true;
-        else if (!expirationDate) expirationDate = expires / 1000;
-      }
-    }
-
-    if (remove) {
-      await chrome.cookies.remove({ url, name }).catch(() => {});
-      pushAll();
-      return;
-    }
-
-    const sameSiteRaw = (attributes.get('samesite') ?? '').toLowerCase();
-    let sameSite = 'lax';
-    if (sameSiteRaw === 'none') sameSite = 'no_restriction';
-    else if (sameSiteRaw === 'strict') sameSite = 'strict';
-    const secure = attributes.has('secure') || sameSite === 'no_restriction';
-    if (sameSite === 'no_restriction' && !attributes.has('secure')) return;
-
-    const details = {
-      url,
-      name,
-      value,
-      path,
-      secure,
-      sameSite,
-      ...(domain ? { domain } : {}),
-      ...(expirationDate ? { expirationDate } : {}),
-    };
-    await chrome.cookies.set(details).catch(() => {});
+  async function write(base, cookieString) {
+    const change = parseCookieWrite(base, cookieString);
+    if (!change) return;
+    if (change.remove) await chrome.cookies.remove(change.remove).catch(() => {});
+    else await chrome.cookies.set(change.set).catch(() => {});
     pushAll();
   }
 
+  /** パネル直下のフレームからの Cookie メッセージなら処理して true を返す。 */
   function handle(event, page) {
     const data = event.data;
     if (event.source !== page.iframe.contentWindow) return false;
@@ -139,7 +148,7 @@ export function createCookieBridge({ getPages }) {
       return true;
     }
     if (data.type === 'cookies:set') {
-      setFromString(`${event.origin}${safePath(data.path)}`, String(data.cookie));
+      write(`${event.origin}${safePath(data.path)}`, String(data.cookie));
       return true;
     }
     return false;

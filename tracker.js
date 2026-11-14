@@ -51,6 +51,23 @@
     observer.observe(head, { subtree: true, childList: true, characterData: true });
   }
 
+  // history.back() はパネル全体の履歴（joint session history）を 1 つ戻すだけなので、
+  // 複数ページを保持していると、表示中ではなく最後に遷移した別のページが戻る（#11）。
+  // navigation.back() はこのフレームの 1 つ前のエントリを指定して戻るので、表示中のページが必ず戻る。
+  // ただし移動先は文書全体の履歴の 1 時点なので、それより後に遷移した非表示のページも
+  // その時点の状態に戻る（1 つの文書の中で iframe ごとに履歴を分ける方法はない）。
+  function traverse(delta) {
+    if (navigation) {
+      const can = delta < 0 ? navigation.canGoBack : navigation.canGoForward;
+      if (!can) return;
+      const result = delta < 0 ? navigation.back() : navigation.forward();
+      result.committed.catch(() => {});
+      result.finished.catch(() => {});
+    } else {
+      history.go(delta);
+    }
+  }
+
   function blockNested(url) {
     let target;
     try {
@@ -91,8 +108,8 @@
     const data = event.data;
     if (data?.__sidepanel !== 1) return;
     if (data.type === 'command') {
-      if (data.command === 'back') history.back();
-      else if (data.command === 'forward') history.forward();
+      if (data.command === 'back') traverse(-1);
+      else if (data.command === 'forward') traverse(1);
       else if (data.command === 'reload') location.reload();
     } else if (data.type === 'nested-blocked') {
       blockNested(data.url);
