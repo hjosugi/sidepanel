@@ -1,5 +1,5 @@
-// ストア掲載用の画像を store/ に生成する。架空のデモサイトだけを使う。
-// usage: npm run screenshots   (BROWSER_BIN で Chromium 系ブラウザを指定できる)
+// ストア掲載用の画像を .release/store-assets/ に生成する。架空のデモサイトだけを使う。
+// usage: npm run release:store:assets   (BROWSER_BIN で Chromium 系ブラウザを指定できる)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { join } from 'node:path';
@@ -14,7 +14,7 @@ import {
 } from './cdp.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
-const out = join(root, 'store');
+const out = join(root, '.release', 'store-assets');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEMOS = {
@@ -158,7 +158,7 @@ async function render(html, width, height, file) {
   await sleep(500);
   const data = await capture(cdp, width, height);
   writeFileSync(join(out, file), Buffer.from(data, 'base64'));
-  console.log(join('store', file));
+  console.log(join('.release', 'store-assets', file));
   cdp.close();
   await closeTarget(brave.port, id);
 }

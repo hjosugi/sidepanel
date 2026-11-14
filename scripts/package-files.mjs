@@ -1,4 +1,4 @@
-// 配布 zip に入れるファイル。開発用のファイル（tools/ や test/）は入れない。
+// 配布 zip に入れるファイル。開発用のファイル（scripts/ や test/、ドキュメント）は入れない。
 // lint はここに載っているファイルだけで参照が解決できることを確かめる。
 export const PACKAGE_FILES = [
   'manifest.json',
@@ -24,5 +24,4 @@ export const PACKAGE_FILES = [
   'ua.js',
   'cookie-shim.js',
   'LICENSE',
-  'README.md',
 ];

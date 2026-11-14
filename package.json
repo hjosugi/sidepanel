@@ -2,16 +2,29 @@
   "name": "sidepanel-bookmarks",
   "version": "1.2.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Bookmarks in the Chrome side panel, with sites opened inside the panel.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
-    "lint": "node tools/lint.mjs && biome check .",
+    "lint": "node scripts/lint.mjs && biome check .",
     "format": "biome check --write .",
-    "test": "node tools/smoke-test.mjs",
-    "compat": "node tools/compat-check.mjs",
-    "zip": "node tools/zip.mjs",
+    "test": "node scripts/smoke-test.mjs",
     "test:unit": "node --test test/*.test.mjs",
-    "screenshots": "node tools/screenshots.mjs"
+    "compat": "node scripts/compat-check.mjs",
+    "release:check": "npm run lint && npm run test:unit && npm test",
+    "release:package": "node scripts/package-extension.mjs",
+    "release:zip": "npm run release:check && npm run release:package",
+    "release:store:assets": "node scripts/generate-store-assets.mjs",
+    "release:store:status": "node scripts/chrome-webstore.mjs status",
+    "release:store:upload": "node scripts/chrome-webstore.mjs upload",
+    "release:store:publish": "node scripts/chrome-webstore.mjs publish",
+    "release:store:submit": "node scripts/chrome-webstore.mjs submit",
+    "release:store:cancel": "node scripts/chrome-webstore.mjs cancel",
+    "release:store": "npm run release:zip && npm run release:store:submit",
+    "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7"

@@ -5,7 +5,7 @@ import { MESSAGES } from '../i18n.js';
 import { PACKAGE_FILES } from './package-files.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
-const skip = new Set(['node_modules', 'dist', '.git']);
+const skip = new Set(['node_modules', '.release', '.git']);
 let failed = false;
 
 function fail(message) {
