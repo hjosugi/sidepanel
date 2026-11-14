@@ -1,28 +1,45 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
-<title>Bookmarks</title>
+<title>Sidepanel Bookmarks</title>
 <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body class="list">
 <header>
-  <button id="menu" title="ブックマーク"><svg viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
-  <button id="back" title="戻る" disabled><svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
-  <button id="fwd" title="進む" disabled><svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
-  <button id="reload" title="再読み込み" disabled><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 2.5v3h-3"/></svg></button>
+  <button id="menu" data-i18n-title="menu.label" data-i18n-aria-label="menu.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+  <button id="back" disabled data-i18n-title="back.label" data-i18n-aria-label="back.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
+  <button id="fwd" disabled data-i18n-title="forward.label" data-i18n-aria-label="forward.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
+  <button id="reload" disabled data-i18n-title="reload.label" data-i18n-aria-label="reload.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 2.5v3h-3"/></svg></button>
   <span id="title"></span>
-  <button id="popout" title="タブで開く" disabled><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
+  <button id="ua" disabled hidden data-mode="mobile" data-i18n-title="mobile.label" data-i18n-aria-label="mobile.label">
+    <svg class="phone" aria-hidden="true" viewBox="0 0 16 16"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>
+    <svg class="desktop" aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M5.5 14h5M8 11.5V14"/></svg>
+  </button>
+  <button id="lang" title="言語 / Language" aria-label="言語 / Language">EN</button>
+  <button id="popout" disabled data-i18n-title="popout.label" data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
 </header>
-<div id="progress"></div>
+<div id="tabs" hidden></div>
+<div id="progress" aria-hidden="true"></div>
+<div id="notice" hidden role="status" aria-live="polite">
+  <span id="notice-text"></span>
+  <button id="notice-open" type="button" data-i18n="notice.open"></button>
+  <button id="notice-close" type="button" data-i18n-aria-label="notice.close" data-i18n-title="notice.close">×</button>
+</div>
 <main>
-  <iframe id="frame" allow="autoplay; clipboard-read; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
-  <nav id="list">
-    <input id="q" type="search" placeholder="ブックマークを検索" autocomplete="off" spellcheck="false">
-    <div id="tree"></div>
+  <div id="frames"></div>
+  <nav id="list" aria-label="Bookmarks">
+    <input id="q" type="search" autocomplete="off" spellcheck="false" data-i18n-placeholder="search.placeholder" data-i18n-aria-label="search.placeholder">
+    <div id="list-body">
+      <div id="tree" role="tree"></div>
+      <p id="empty" role="status" hidden></p>
+    </div>
   </nav>
 </main>
+<p id="status" class="sr-only" role="status" aria-live="polite"></p>
+<template id="bm-template"><a class="bm" role="treeitem" tabindex="-1"><img alt="" width="16" height="16" loading="lazy" decoding="async"><span></span></a></template>
+<template id="folder-template"><details role="group"><summary role="treeitem" tabindex="-1"><span></span></summary></details></template>
 <script type="module" src="sidepanel.js"></script>
 </body>
 </html>

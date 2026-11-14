@@ -1,22 +1,36 @@
 {
   "manifest_version": 3,
   "name": "Sidepanel Bookmarks",
-  "version": "1.0.0",
-  "description": "ブックマークをサイドパネルに置き、そのままサイドパネル内で開く軽量拡張",
+  "version": "1.1.0",
+  "description": "Keep your bookmarks in the Chrome side panel and open them right there. Lightweight, no build step.",
   "minimum_chrome_version": "128",
   "permissions": [
     "sidePanel",
     "bookmarks",
+    "cookies",
     "favicon",
     "declarativeNetRequestWithHostAccess",
+    "scripting",
+    "storage",
     "webRequest"
   ],
   "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
+  "background": { "service_worker": "background.js", "type": "module" },
   "side_panel": { "default_path": "sidepanel.html" },
   "action": {
     "default_title": "Sidepanel Bookmarks",
     "default_icon": { "16": "icons/16.png", "32": "icons/32.png" }
   },
-  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  "commands": {
+    "toggle-list": {
+      "suggested_key": { "default": "Alt+Shift+B" },
+      "description": "Toggle the bookmark list"
+    }
+  },
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  }
 }
