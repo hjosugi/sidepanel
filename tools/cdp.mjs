@@ -95,18 +95,25 @@ export async function newTab(port, url) {
   return json(port, `/json/new?${encodeURIComponent(url)}`, { method: 'PUT' });
 }
 
-// Chrome ships component extensions too, so look for this extension's worker.
-export async function extensionId(port, worker = 'background.js') {
-  const target = await waitFor(async () => {
-    const list = await listTargets(port);
-    return (
-      list.find(
-        (item) =>
-          item.url.startsWith('chrome-extension://') && new URL(item.url).pathname === `/${worker}`,
-      ) ?? null
+// Chrome ships component extensions with their own background.js workers,
+// so ask each worker for its manifest name.
+export async function extensionId(port, name = 'Sidepanel Bookmarks') {
+  return waitFor(async () => {
+    const workers = (await listTargets(port)).filter(
+      (item) => item.type === 'service_worker' && item.url.startsWith('chrome-extension://'),
     );
+    for (const worker of workers) {
+      const cdp = await Cdp.connect(worker.webSocketDebuggerUrl).catch(() => null);
+      if (!cdp) continue;
+      try {
+        const found = await cdp.evaluate('chrome.runtime.getManifest().name').catch(() => null);
+        if (found === name) return new URL(worker.url).host;
+      } finally {
+        cdp.close();
+      }
+    }
+    return null;
   });
-  return new URL(target.url).host;
 }
 
 export class Cdp {
