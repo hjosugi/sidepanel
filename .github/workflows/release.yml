@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - name: Check version against tag
+        run: |
+          node -e '
+            const manifest = require("./manifest.json");
+            const pkg = require("./package.json");
+            const tag = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+            if (manifest.version !== tag || pkg.version !== tag) {
+              console.error(`version mismatch: tag=${tag} manifest=${manifest.version} package=${pkg.version}`);
+              process.exit(1);
+            }
+          '
+      - run: npm run zip
+      - name: Create release
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
