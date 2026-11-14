@@ -1,6 +1,9 @@
+<!-- i18n: language-switcher -->
+[English](README.md) | [日本語](README.ja.md)
+
 # Sidepanel Bookmarks
 
-A zero-build Chrome extension that puts your bookmarks in the side panel and opens pages **inside the panel**, like the Edge sidebar. The UI is English by default and can be switched to Japanese at runtime.
+A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and opens pages **inside the panel**, like the Edge sidebar. The UI is English by default and can be switched to Japanese at runtime.
 
 ## Features
 
@@ -18,12 +21,11 @@ A zero-build Chrome extension that puts your bookmarks in the side panel and ope
   (see [#16](https://github.com/hjosugi/sidepanel/issues/16))
 - Nested iframes that would otherwise be blocked are removed instead of being exposed
 - Keyboard navigation (↑↓←→, Home/End), ARIA labels, live status messages
-- English / 日本語 switch in the header (English is the default)
 - Settings page (the sliders button next to the search box, or the extension's Options): language, mobile layout, pages kept open, sites shown in desktop layout
 
 ## Install
 
-From the Chrome Web Store (once published), or manually:
+The Chrome Web Store listing is in preparation ([docs/RELEASE.md](docs/RELEASE.md)). Until then:
 
 1. Download the zip from [Releases](https://github.com/hjosugi/sidepanel/releases) and extract it (or `git clone`)
 2. Open `chrome://extensions`, turn on **Developer mode**
@@ -32,7 +34,7 @@ From the Chrome Web Store (once published), or manually:
 
 Chrome 128+ is required. Chromium-based browsers such as Brave and Edge also work.
 
-## How it works and permissions
+## How It Works and Permissions
 
 Many sites refuse to be embedded with `X-Frame-Options` or CSP `frame-ancestors`. This extension uses declarativeNetRequest session rules to remove those headers **only for requests that do not belong to a tab** (i.e. the iframes inside the side panel). Normal tabs are never affected. The rules and content scripts are installed while a side panel is open and removed when the last one closes.
 
@@ -49,65 +51,39 @@ Some Google services reject `Sec-Fetch-Dest: iframe` at the server. For panel fr
 | `webRequest` | Observe the current frame URLs, HTTP failures and the original embedding headers (read-only) |
 | `cookies` | Give panel frames the same non-HttpOnly view of `document.cookie` as a normal tab |
 
-The extension itself has no runtime dependencies, no build step, no analytics and no remote code. Nothing leaves your browser; see [PRIVACY.md](PRIVACY.md). Development dependencies are only for linting, tests and packaging.
+The extension itself has no runtime dependencies, no build step, no analytics and no remote code. Nothing leaves your browser; see the [privacy policy](docs/PRIVACY.md).
 
 ## Limitations
 
 - Some sites cannot work in a frame at all (Google sign-in, Cloudflare challenges such as ChatGPT, see [#17](https://github.com/hjosugi/sidepanel/issues/17)). Use ↗ / the fallback bar to open them in a tab.
 - Removing `X-Frame-Options` is safe, but a CSP containing `frame-ancestors` has to have the **whole** CSP header removed, because DNR cannot edit a single directive. This only applies to direct panel frames.
 - The panel is one document, so the browser keeps a single history for all pages kept open. ‹ always moves the visible page back, but a hidden page that navigated after that point is returned to its state at that time.
-- HttpOnly cookies are intentionally never exposed to `document.cookie`. The shim uses non-HttpOnly cookies from the browser cookie store; on the very first load the jar may arrive a few milliseconds late. The last jar is cached in `sessionStorage` for the next load.
-- Storage access / cookies in incognito windows are not handled separately.
-- Bookmarklets (`javascript:`) are not supported and are shown disabled. `chrome://` pages open in a tab.
+- HttpOnly cookies are intentionally never exposed to `document.cookie`. On the very first load the cookie jar may arrive a few milliseconds late; the last jar is cached in `sessionStorage` for the next load.
+- Incognito windows and bookmarklets (`javascript:`) are not supported. `chrome://` pages open in a tab.
 - The last visited URL is restored, including SPA navigations; it is not necessarily the bookmark's original URL.
-- Search text stays until you clear it. In the list, Esc clears the search first, then closes the list.
 - Mobile UA is a heuristic. Use the 📱/🖥 button for sites that expect a desktop layout.
 
 ## Development
 
 ```sh
-npm install
-npm test            # headless browser smoke test (Brave by default, or BROWSER_BIN=/path/to/chrome)
-npm run test:unit   # pure functions (rules, embedding check, cookie parsing, settings)
-npm run lint        # Biome + manifest / packaged files / i18n checks
-npm run zip         # build dist/sidepanel-bookmarks-<version>.zip
-npm run screenshots # regenerate store/ images with a headless browser
+npm ci
+npm run release:check   # lint + unit tests + headless side panel smoke test
+npm run release:zip     # release:check, then .release/ artifacts
 ```
 
-The smoke test launches a real headless Chromium browser, loads the unpacked extension, opens the actual side panel through `chrome.sidePanel.open`, and verifies DNR headers, SPA tracking, mobile UA, error fallback, nested-frame blocking, the cookie shim, the settings page and rule cleanup against a local server. Branded Google Chrome ignores `--load-extension` since version 137, so CI uses Chrome for Testing.
+| Command | What it does |
+| --- | --- |
+| `npm run lint` | Biome, plus manifest / packaged-file / i18n checks |
+| `npm run test:unit` | Pure functions: rules, embedding check, cookie parsing, settings |
+| `npm test` | Loads the extension into headless Brave (or `BROWSER_BIN`), opens the real side panel and checks DNR headers, SPA tracking, mobile UA, fallbacks, nested-frame blocking, the cookie shim, settings and rule cleanup against a local server |
+| `npm run release:package` | Only build `.release/sidepanel-bookmarks-vX.Y.Z.zip` and its checksum, metadata, notes and tester guide |
+| `npm run release:store:assets` | Render store screenshots and the promo tile into `.release/store-assets/` |
+| `npm run version:set -- X.Y.Z` | Set the version in `package.json`, `package-lock.json` and `manifest.json` |
+| `npm run compat` | Check popular sites with `Sec-Fetch-Dest: iframe` |
 
-### Releasing
+Branded Google Chrome ignores `--load-extension` since 137, so use Brave, Chromium or Chrome for Testing for `npm test`; CI uses Chrome for Testing and runs the smoke test on the unpacked release zip.
 
-1. Bump `version` in `manifest.json` and `package.json`
-2. Push a `vX.Y.Z` tag. The Release workflow checks the version, builds the zip and attaches it to a GitHub release
-3. If the Chrome Web Store secrets are configured, the same workflow uploads the zip and submits it for review (see [store/README.md](store/README.md))
-
-## 日本語
-
-Chrome のサイドパネルにブックマークを並べ、クリックしたページをそのままパネル内で開く拡張機能です。UI は英語が既定で、ヘッダーの **EN/JA** ボタンから日本語に切り替えられます。
-
-主な機能:
-
-- ブックマークのツリー表示・検索・開閉状態の記憶
-- パネル内表示、戻る/進む、再読み込み、タブで開く
-- モバイル UA による幅最適化（サイト別にデスクトップ表示へ切替可能）
-- 複数ページ（既定 3、設定で 1〜5）を保持し、タブ列から Gmail ⇄ Claude ⇄ Keep を再読み込みなしで切り替え
-- SPA の URL・タイトル追従、HTTP エラー/ログイン画面/Cloudflare のフォールバック
-- パネル内の `document.cookie` を通常タブと同じ非 HttpOnly Cookie の見え方に
-- 埋め込み禁止のネスト iframe を表示せず除去（クリックジャッキング対策）
-- パネルを閉じるとルールとコンテンツスクリプトを削除
-- キーボード操作・スクリーンリーダー対応
-- 設定ページ（検索欄の右のボタン）: 言語、モバイル表示、保持するページ数、デスクトップ表示にするサイト
-
-制限:
-
-- Google ログインや Cloudflare チャレンジ（ChatGPT など、[#17](https://github.com/hjosugi/sidepanel/issues/17)）など、iframe 内で完結しないサイトはタブで開いてください
-- `frame-ancestors` を含む CSP はヘッダー全体を外す必要があります（パネル直下のフレームのみ）
-- パネルは 1 つの文書なので、履歴はすべてのページで共通です。‹ は表示中のページを必ず戻しますが、それより後に遷移した非表示のページもその時点の状態に戻ります
-- HttpOnly Cookie は `document.cookie` には出しません。初回読み込み時は Cookie の反映が数 ms 遅れることがあります
-- シークレットウィンドウ、ブックマークレットは非対応です
-
-データは一切外部に送信しません（[PRIVACY.md](PRIVACY.md)）。
+Releases are automatic: a version bump merged into `main` builds the zip, submits it to the Chrome Web Store when configured, then tags the commit and creates the GitHub Release. See [docs/RELEASE.md](docs/RELEASE.md).
 
 ## License
 
