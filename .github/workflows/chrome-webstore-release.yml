@@ -1,0 +1,256 @@
+name: Chrome Web Store Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional version to set before packaging. Prefer committed version bumps on main for normal releases."
+        required: false
+        type: string
+      publish:
+        description: "Submit the uploaded package for Chrome Web Store review/publishing."
+        required: true
+        default: true
+        type: boolean
+      status_only:
+        description: "Only fetch Chrome Web Store status. Does not package, upload, or publish."
+        required: true
+        default: false
+        type: boolean
+      publish_only:
+        description: "Publish the existing Chrome Web Store draft. Does not package or upload."
+        required: true
+        default: false
+        type: boolean
+      cancel_submission:
+        description: "Cancel the submission waiting for review, so a newer version can be uploaded. Does not package, upload, or publish."
+        required: false
+        default: false
+        type: boolean
+      skip_review:
+        description: "Ask Chrome Web Store to skip review when the item is eligible."
+        required: true
+        default: false
+        type: boolean
+      dry_run:
+        description: "Validate package and print intended Chrome Web Store operations without network calls."
+        required: true
+        default: false
+        type: boolean
+      deploy_percentage:
+        description: "Optional initial rollout percentage, 0-100."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chrome-webstore-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      version: ${{ steps.target.outputs.version }}
+      publish: ${{ steps.target.outputs.publish }}
+      store: ${{ steps.target.outputs.store }}
+    env:
+      CHROME_WEBSTORE_PUBLISHER_ID: ${{ secrets.CHROME_WEBSTORE_PUBLISHER_ID }}
+      CHROME_WEBSTORE_EXTENSION_ID: ${{ secrets.CHROME_WEBSTORE_EXTENSION_ID }}
+      CHROME_WEBSTORE_CLIENT_ID: ${{ secrets.CHROME_WEBSTORE_CLIENT_ID }}
+      CHROME_WEBSTORE_CLIENT_SECRET: ${{ secrets.CHROME_WEBSTORE_CLIENT_SECRET }}
+      CHROME_WEBSTORE_REFRESH_TOKEN: ${{ secrets.CHROME_WEBSTORE_REFRESH_TOKEN }}
+      CHROME_WEBSTORE_ACCESS_TOKEN: ${{ secrets.CHROME_WEBSTORE_ACCESS_TOKEN }}
+      CHROME_WEBSTORE_BLOCK_ON_WARNINGS: "1"
+      CHROME_WEBSTORE_SKIP_REVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_review == true }}
+      CHROME_WEBSTORE_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+      CHROME_WEBSTORE_DEPLOY_PERCENTAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_percentage || '' }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      # A push publishes when it is a vX.Y.Z tag, or a main push whose version has
+      # no tag yet; the github-release job then tags that commit. The store steps
+      # run only once the store item is configured (docs/RELEASE.md); until then a
+      # release only creates the GitHub Release.
+      - name: Resolve release target
+        id: target
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          MAINTENANCE: ${{ github.event_name == 'workflow_dispatch' && (inputs.status_only || inputs.publish_only || inputs.cancel_submission) }}
+          SUBMIT_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          manifest=$(node -p 'require("./manifest.json").version')
+          if [ "$version" != "$manifest" ]; then
+            echo "::error::package.json $version does not match manifest.json $manifest"
+            exit 1
+          fi
+          publish=false
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = tag ]; then
+            if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match package.json and manifest $version"
+              exit 1
+            fi
+            publish=true
+          elif [ "$GITHUB_EVENT_NAME" = push ]; then
+            released=$(git ls-remote --tags origin "refs/tags/v$version")
+            if [ -z "$released" ]; then publish=true; fi
+          fi
+          store=false
+          if [ -n "$CHROME_WEBSTORE_EXTENSION_ID" ] && [ -n "$CHROME_WEBSTORE_PUBLISHER_ID" ]; then store=true; fi
+          build=true
+          if [ "$MAINTENANCE" = true ]; then build=false; fi
+          upload=false
+          submit=false
+          if [ "$publish" = true ] && [ "$store" = true ]; then upload=true; submit=true; fi
+          if [ "$DISPATCH" = true ] && [ "$build" = true ]; then
+            upload=true
+            submit="$SUBMIT_INPUT"
+          fi
+          if [ "$publish" = true ] && [ "$store" = false ]; then
+            echo "::notice::Chrome Web Store is not configured; v$version gets a GitHub Release only"
+          fi
+          echo "Release v$version: publish=$publish store=$store build=$build upload=$upload submit=$submit"
+          {
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "store=$store"
+            echo "build=$build"
+            echo "upload=$upload"
+            echo "submit=$submit"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Branded Google Chrome ignores --load-extension since 137, so use Chrome for Testing.
+      - name: Install Chrome for Testing
+        id: chrome
+        if: ${{ steps.target.outputs.build == 'true' }}
+        run: |
+          bin="$(npx --yes @puppeteer/browsers@3.2.7 install chrome@stable --path "$RUNNER_TEMP/browsers" | tail -1 | cut -d' ' -f2-)"
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        id: google-auth
+        if: ${{ (steps.target.outputs.upload == 'true' || steps.target.outputs.submit == 'true' || steps.target.outputs.build != 'true') && env.CHROME_WEBSTORE_DRY_RUN != 'true' && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' }}
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+
+      - name: Use short-lived Chrome Web Store access token
+        if: ${{ steps.google-auth.outcome == 'success' }}
+        env:
+          ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: echo "CHROME_WEBSTORE_ACCESS_TOKEN=${ACCESS_TOKEN}" >> "$GITHUB_ENV"
+
+      - name: Set manual version
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.target.outputs.build == 'true' && inputs.version != '' }}
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: npm run version:set -- "$RELEASE_VERSION"
+
+      - name: Fetch Chrome Web Store status
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.status_only == true }}
+        run: npm run release:store:status
+
+      - name: Publish existing Chrome Web Store draft
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_only == true }}
+        run: npm run release:store:publish
+
+      - name: Cancel pending Chrome Web Store submission
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.cancel_submission == true }}
+        run: npm run release:store:cancel
+
+      - name: Build release zip
+        if: ${{ steps.target.outputs.build == 'true' }}
+        env:
+          BROWSER_BIN: ${{ steps.chrome.outputs.bin }}
+        run: npm run release:zip
+
+      - name: Upload release artifacts
+        if: ${{ steps.target.outputs.build == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: chrome-extension-release
+          path: .release/*
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Upload to Chrome Web Store
+        if: ${{ steps.target.outputs.upload == 'true' }}
+        run: npm run release:store:upload
+
+      - name: Publish in Chrome Web Store
+        if: ${{ steps.target.outputs.submit == 'true' }}
+        run: npm run release:store:publish
+
+  # Runs only after the store accepted the submission (or when the store is not
+  # configured yet), so a failed upload leaves no tag behind and re-running the
+  # failed job retries the same version.
+  github-release:
+    needs: release
+    if: ${{ needs.release.outputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: v${{ needs.release.outputs.version }}
+      STORE: ${{ needs.release.outputs.store }}
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: chrome-extension-release
+          path: .release
+
+      # Creating the tag through the release API with GITHUB_TOKEN does not
+      # trigger the tag-push run, so the store sees one submission per version.
+      - name: Create GitHub Release
+        run: |
+          base=".release/sidepanel-bookmarks-$TAG"
+          assets=("$base.zip" "$base.sha256" "$base-tester-install.md")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            exit 0
+          fi
+          sha256=$(cut -d ' ' -f 1 "$base.sha256")
+          if [ "$STORE" = true ]; then
+            status="Chrome Web Store の審査に提出済み / Submitted for Chrome Web Store review."
+          else
+            status="Chrome Web Store には未提出（ストアのアイテム未設定） / Not submitted to the Chrome Web Store yet."
+          fi
+          gh release create "$TAG" "${assets[@]}" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --generate-notes \
+            --notes "$status
+
+          SHA-256 \`sidepanel-bookmarks-$TAG.zip\`: \`$sha256\`"

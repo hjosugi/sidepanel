@@ -1,34 +1,50 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
-  lint-and-test:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: "24"
           cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test:unit
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
       # Branded Google Chrome ignores --load-extension since 137, so use Chrome for Testing.
       - name: Install Chrome for Testing
         id: chrome
         run: |
           bin="$(npx --yes @puppeteer/browsers@3.2.7 install chrome@stable --path "$RUNNER_TEMP/browsers" | tail -1 | cut -d' ' -f2-)"
           echo "bin=$bin" >> "$GITHUB_OUTPUT"
-      - name: Build and unpack the release zip
+
+      - name: Release package smoke
         run: |
-          npm run zip
-          unzip -q dist/*.zip -d "$RUNNER_TEMP/extension"
-      - name: Smoke test the packaged extension (headless Chrome for Testing)
+          npm run release:package
+          unzip -q .release/*.zip -d "$RUNNER_TEMP/extension"
+
+      - name: Smoke test the packaged extension
         run: npm test
         env:
           BROWSER_BIN: ${{ steps.chrome.outputs.bin }}
