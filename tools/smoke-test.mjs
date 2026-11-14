@@ -474,6 +474,9 @@ try {
   check('no uncaught errors in the side panel', errors.length === 0, errors.join(' | '));
 } catch (error) {
   console.error('TEST ERROR', error);
+  const targets = await listTargets(brave.port).catch(() => []);
+  console.error(targets.map((target) => `${target.type} ${target.url}`).join('\n'));
+  console.error(brave.output().slice(-2000));
   results.push({ name: 'harness', ok: false });
 } finally {
   panel?.close();

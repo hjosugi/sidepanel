@@ -95,12 +95,17 @@ export async function newTab(port, url) {
   return json(port, `/json/new?${encodeURIComponent(url)}`, { method: 'PUT' });
 }
 
-export async function extensionId(port) {
-  const targets = await waitFor(async () => {
+// Chrome ships component extensions too, so look for this extension's worker.
+export async function extensionId(port, worker = 'background.js') {
+  const target = await waitFor(async () => {
     const list = await listTargets(port);
-    return list.some((target) => target.url.includes('chrome-extension://')) ? list : null;
+    return (
+      list.find(
+        (item) =>
+          item.url.startsWith('chrome-extension://') && new URL(item.url).pathname === `/${worker}`,
+      ) ?? null
+    );
   });
-  const target = targets.find((item) => item.url.includes('chrome-extension://'));
   return new URL(target.url).host;
 }
 
