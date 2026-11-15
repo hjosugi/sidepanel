@@ -8,8 +8,11 @@ import {
   waitFor,
 } from './cdp.mjs';
 
+// PROFILE_DIR=<ログイン済みプロファイルのコピー> で実際のサイトをサイドパネルに開く。
+// HEADED=1 でウィンドウを表示（Cloudflare などはヘッドレスをボットと判定しやすい）、
+// SITES=ChatGPT,Claude で対象を絞る。KEEP_PROFILE=1 でなければ終了時にプロファイルを消す。
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const sites = [
+const allSites = [
   ['Keep', 'https://keep.google.com/'],
   ['Calendar', 'https://calendar.google.com/calendar/u/0/r'],
   ['Drive', 'https://drive.google.com/drive/my-drive'],
@@ -20,12 +23,41 @@ const sites = [
   ['ChatGPT', 'https://chatgpt.com/'],
   ['YouTube', 'https://www.youtube.com/'],
 ];
+// SITES には名前のほか URL も書ける（SITES=ChatGPT,https://example.com/）
+const only = (process.env.SITES ?? '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
+const sites = only.length
+  ? only.flatMap((item) =>
+      /^https?:\/\//.test(item)
+        ? [[new URL(item).hostname, item]]
+        : allSites.filter(([name]) => name.toLowerCase() === item.toLowerCase()),
+    )
+  : allSites;
 
 const brave = await launchBrave(new URL('..', import.meta.url).pathname, {
   profile: process.env.PROFILE_DIR || undefined,
   cleanupProfile: process.env.KEEP_PROFILE !== '1',
+  headless: process.env.HEADED !== '1',
 });
 let panel;
+
+async function snapshot() {
+  const title = await panel.evaluate('document.getElementById("title").textContent');
+  const notice = await panel.evaluate(
+    'document.getElementById("notice").hidden ? "" : document.getElementById("notice-text").textContent',
+  );
+  const net = await panel.evaluate('window.__net.splice(0)');
+  const tree = await panel.send('Page.getFrameTree');
+  const frames = [];
+  (function walk(node) {
+    frames.push(node.frame.url);
+    for (const child of node.childFrames ?? []) walk(child);
+  })(tree.frameTree);
+  return { title, notice, net, frames };
+}
+
 try {
   const id = await extensionId(brave.port);
   const launcher = await newTab(brave.port, `chrome-extension://${id}/sidepanel.html`);
@@ -78,18 +110,18 @@ try {
       `[...document.querySelectorAll('.bm')].find((a) => a.href === ${JSON.stringify(url)}).click()`,
     );
     await sleep(4000);
-    const title = await panel.evaluate('document.getElementById("title").textContent');
-    const notice = await panel.evaluate(
-      'document.getElementById("notice").hidden ? "" : document.getElementById("notice-text").textContent',
-    );
-    const net = await panel.evaluate('window.__net.splice(0)');
-    const tree = await panel.send('Page.getFrameTree');
-    const frames = [];
-    (function walk(node) {
-      frames.push(node.frame.url);
-      for (const child of node.childFrames ?? []) walk(child);
-    })(tree.frameTree);
-    console.log(JSON.stringify({ name, url, title, notice, net, frames }));
+    console.log(JSON.stringify({ name, url, ...(await snapshot()) }));
+
+    // #17 モバイル表示のチャレンジは案内バーからデスクトップ表示に切り替えて、通過するかを見る
+    const offersDesktop = await panel.evaluate('!document.getElementById("notice-desktop").hidden');
+    if (offersDesktop) {
+      await panel.evaluate('document.getElementById("notice-desktop").click()');
+      await waitFor(() => panel.evaluate('document.getElementById("notice").hidden'), {
+        timeout: 20000,
+      }).catch(() => {});
+      await sleep(1500);
+      console.log(JSON.stringify({ name, url, layout: 'desktop', ...(await snapshot()) }));
+    }
   }
 } finally {
   panel?.close();
