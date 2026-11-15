@@ -19,7 +19,14 @@ test('mobile UA can be turned off', () => {
 
 test('desktop hosts are excluded from the mobile UA rule', () => {
   const rule = buildRules({ desktopHosts: ['reddit.com'] }).find((item) => item.id === 10);
-  assert.deepEqual(rule.condition.excludedRequestDomains, ['reddit.com']);
+  assert.ok(rule.condition.excludedRequestDomains.includes('reddit.com'));
+});
+
+test('Cloudflare challenge frames never get the mobile UA (#17)', () => {
+  for (const desktopHosts of [[], ['chatgpt.com']]) {
+    const rule = buildRules({ desktopHosts }).find((item) => item.id === 10);
+    assert.ok(rule.condition.excludedRequestDomains.includes('challenges.cloudflare.com'));
+  }
 });
 
 test('CSP is only removed when it contains frame-ancestors', () => {

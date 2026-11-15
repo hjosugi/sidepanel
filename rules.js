@@ -5,6 +5,11 @@ export const RULE_IDS = [1, 2, 3, 10];
 
 const NONE = chrome.tabs.TAB_ID_NONE;
 
+// Cloudflare のチャレンジ（Turnstile）は、自分のフレームの User-Agent ヘッダーと
+// navigator.userAgent を照合する。ua.js は入れ子のフレームでは動かないので、
+// ここにモバイル UA を送ると両者が食い違い、確認が終わらなくなる（#17）。
+const NEVER_MOBILE_HOSTS = ['challenges.cloudflare.com'];
+
 function androidUserAgent() {
   const version = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] ?? '128';
   return `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version}.0.0.0 Mobile Safari/537.36`;
@@ -70,7 +75,7 @@ export function buildRules({ mobileUA = true, desktopHosts = [] } = {}) {
       },
       condition: {
         ...panelFrame,
-        ...(desktopHosts.length ? { excludedRequestDomains: desktopHosts } : {}),
+        excludedRequestDomains: [...desktopHosts, ...NEVER_MOBILE_HOSTS],
       },
     });
   }

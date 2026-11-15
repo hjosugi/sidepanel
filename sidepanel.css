@@ -153,7 +153,9 @@ body.busy #progress {
   flex: 1;
   min-width: 0;
 }
+#notice-desktop,
 #notice-open {
+  flex: none;
   width: auto;
   height: 24px;
   padding: 0 8px;
@@ -161,6 +163,7 @@ body.busy #progress {
   background: var(--bg);
   color: var(--accent);
   font-size: 12px;
+  white-space: nowrap;
 }
 #notice-close {
   flex: none;

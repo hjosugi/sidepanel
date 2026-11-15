@@ -39,6 +39,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   const notice = document.getElementById('notice');
   const noticeText = document.getElementById('notice-text');
   const noticeOpen = document.getElementById('notice-open');
+  const noticeDesktop = document.getElementById('notice-desktop');
   const noticeClose = document.getElementById('notice-close');
   const menu = document.getElementById('menu');
   const back = document.getElementById('back');
@@ -88,6 +89,11 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
 
   function isDesktopHost(host) {
     return settings.desktopHosts.some((saved) => host === saved || host.endsWith(`.${saved}`));
+  }
+
+  function isMobileLayout(page) {
+    const host = hostOf(page.url);
+    return settings.mobileUA && Boolean(host) && !isDesktopHost(host);
   }
 
   function updateToolbar() {
@@ -145,7 +151,13 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     }
     notice.hidden = false;
     const params = kind === 'http' ? { status: page.httpStatus ?? '' } : {};
-    noticeText.textContent = t(`notice.${kind}`, params);
+    // Cloudflare のチャレンジはモバイル UA では通らない（#17）。デスクトップ表示への切り替えを案内する
+    const mobileChallenge = kind === 'challenge' && isMobileLayout(page);
+    noticeText.textContent = t(
+      mobileChallenge ? 'notice.challengeMobile' : `notice.${kind}`,
+      params,
+    );
+    noticeDesktop.hidden = !mobileChallenge;
     noticeOpen.hidden = kind === 'unsupported';
   }
 
@@ -441,18 +453,27 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     if (page) clearNotice(page);
   });
 
-  ua.addEventListener('click', async () => {
-    const page = active();
-    if (!page) return;
+  async function setDesktop(page, desktop) {
     const host = hostOf(page.url);
-    if (!host) return;
-    const desktopHosts = isDesktopHost(host)
-      ? settings.desktopHosts.filter((saved) => host !== saved && !host.endsWith(`.${saved}`))
-      : [...settings.desktopHosts, host];
+    if (!host || isDesktopHost(host) === desktop) return;
+    const desktopHosts = desktop
+      ? [...settings.desktopHosts, host]
+      : settings.desktopHosts.filter((saved) => host !== saved && !host.endsWith(`.${saved}`));
     settings = await setSettings({ desktopHosts });
     await chrome.runtime.sendMessage({ type: 'settings-changed' }).catch(() => {});
     updateToolbar();
+    updateNotice();
     reloadActive();
+  }
+
+  noticeDesktop.addEventListener('click', () => {
+    const page = active();
+    if (page) setDesktop(page, true);
+  });
+
+  ua.addEventListener('click', () => {
+    const page = active();
+    if (page) setDesktop(page, !isDesktopHost(hostOf(page.url)));
   });
 
   // オプションページや別ウィンドウのパネルで変わった設定を反映する

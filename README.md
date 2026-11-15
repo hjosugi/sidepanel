@@ -17,6 +17,7 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 - Keep several pages alive (3 by default, 1–5 in Settings). A tab strip appears for open pages, so Gmail ⇄ Claude ⇄ Keep switches without reloading
 - Page titles and SPA (`pushState`) URLs are tracked from a content script
 - Fallback bar for HTTP errors, sign-in pages and Cloudflare checks, with "Open in tab"
+  - A Cloudflare check in mobile layout offers a one-click switch to desktop layout, where the check can finish inside the panel
 - `document.cookie` in the panel behaves like a normal tab for non-HttpOnly cookies
   (see [#16](https://github.com/hjosugi/sidepanel/issues/16))
 - Nested iframes that would otherwise be blocked are removed instead of being exposed
@@ -40,6 +41,8 @@ Many sites refuse to be embedded with `X-Frame-Options` or CSP `frame-ancestors`
 
 Some Google services reject `Sec-Fetch-Dest: iframe` at the server. For panel frames the request headers are rewritten to look like a top-level navigation. Google Keep, Calendar, Drive, Contacts and Tasks then load (see [#1](https://github.com/hjosugi/sidepanel/issues/1)).
 
+The mobile UA is never sent to Cloudflare's challenge frame (`challenges.cloudflare.com`). Turnstile compares the `User-Agent` header with `navigator.userAgent` in its own frame, so a rewritten header there keeps the check from ever finishing (see [#17](https://github.com/hjosugi/sidepanel/issues/17)).
+
 | Permission | Why |
 | --- | --- |
 | `sidePanel` | Show the side panel |
@@ -55,7 +58,8 @@ The extension itself has no runtime dependencies, no build step, no analytics an
 
 ## Limitations
 
-- Some sites cannot work in a frame at all (Google sign-in, Cloudflare challenges such as ChatGPT, see [#17](https://github.com/hjosugi/sidepanel/issues/17)). Use ↗ / the fallback bar to open them in a tab.
+- Some sites cannot work in a frame at all (Google sign-in). Use ↗ / the fallback bar to open them in a tab.
+- Cloudflare checks (ChatGPT, for example) only finish in desktop layout: in mobile layout the page and its scripts would send different user agents. Use the fallback bar's "Desktop layout" button or 📱/🖥 ([#17](https://github.com/hjosugi/sidepanel/issues/17)).
 - Removing `X-Frame-Options` is safe, but a CSP containing `frame-ancestors` has to have the **whole** CSP header removed, because DNR cannot edit a single directive. This only applies to direct panel frames.
 - The panel is one document, so the browser keeps a single history for all pages kept open. ‹ always moves the visible page back, but a hidden page that navigated after that point is returned to its state at that time.
 - HttpOnly cookies are intentionally never exposed to `document.cookie`. On the very first load the cookie jar may arrive a few milliseconds late; the last jar is cached in `sessionStorage` for the next load.

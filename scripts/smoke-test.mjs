@@ -209,6 +209,47 @@ try {
     await panel.evaluate('document.getElementById("notice-text").textContent'),
   );
 
+  // #17 challenges never pass with the mobile UA, so the notice offers desktop layout
+  check(
+    '#17 challenge in mobile layout offers desktop layout',
+    await panel.evaluate('!document.getElementById("notice-desktop").hidden'),
+  );
+  await reset();
+  await panel.evaluate('document.getElementById("notice-desktop").click()');
+  await waitFor(async () => (await logs()).logs.some((entry) => entry.path === '/challenge'), {
+    timeout: 5000,
+  }).catch(() => {});
+  const desktopLog = (await logs()).logs.filter((entry) => entry.path === '/challenge').at(-1);
+  const desktopHosts = await panel.evaluate(
+    "chrome.storage.local.get('settings').then(({ settings }) => settings?.desktopHosts ?? [])",
+  );
+  check(
+    '#17 desktop layout button reloads the page with a desktop UA',
+    desktopHosts.includes('127.0.0.1') &&
+      Boolean(desktopLog) &&
+      !desktopLog.headers['user-agent']?.includes('Android'),
+    `${JSON.stringify(desktopHosts)} ${desktopLog?.headers['user-agent']}`,
+  );
+  await sleep(500);
+  check(
+    '#17 desktop layout hides the switch',
+    await panel.evaluate('document.getElementById("notice-desktop").hidden'),
+  );
+  await panel.evaluate('document.getElementById("ua").click()');
+  await sleep(800);
+
+  // #17 the 403 challenge response is not an HTTP error, so the notice clears once it passes
+  await addBookmark(`${server.base}/challenge?pass=1`, 'Challenge pass');
+  await openBookmark(`${server.base}/challenge?pass=1`);
+  await waitFor(async () => (await title()) === 'Passed', { timeout: 5000 }).catch(() => {});
+  await sleep(300);
+  check(
+    '#17 notice clears after the challenge passes',
+    (await title()) === 'Passed' &&
+      (await panel.evaluate('document.getElementById("notice").hidden')),
+    `title=${await title()}`,
+  );
+
   // #7 nested iframe observation
   await reset();
   await addBookmark(`${server.base}/nested`, 'Nested');

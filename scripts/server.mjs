@@ -8,6 +8,7 @@ const XFO = {
 export async function startServer() {
   const logs = [];
   const reports = [];
+  const challenged = new Set();
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -89,9 +90,22 @@ export async function startServer() {
       return;
     }
 
+    // Cloudflare と同じく 403 + cf-mitigated で返す。?pass=<id> は 1 回目だけチャレンジを出し、
+    // 同じ URL を再読み込みすると通過する
     if (path === '/challenge') {
-      res.writeHead(200, { 'content-type': 'text/html' });
-      res.end('<!doctype html><title>Just a moment...</title><div id="challenge-stage"></div>');
+      const pass = url.searchParams.get('pass');
+      if (pass && challenged.has(pass)) {
+        res.writeHead(200, { 'content-type': 'text/html' });
+        res.end('<!doctype html><title>Passed</title><h1>Passed</h1>');
+        return;
+      }
+      if (pass) challenged.add(pass);
+      res.writeHead(403, { 'content-type': 'text/html', 'cf-mitigated': 'challenge' });
+      res.end(
+        `<!doctype html><title>Just a moment...</title><div id="challenge-stage"></div>${
+          pass ? '<script>setTimeout(() => location.reload(), 300)</script>' : ''
+        }`,
+      );
       return;
     }
 

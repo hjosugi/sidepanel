@@ -17,6 +17,7 @@ Chrome のサイドパネルにブックマークを並べ、クリックした�
 - 複数のページを保持（既定 3、設定で 1〜5）。開いているページのタブ列から Gmail ⇄ Claude ⇄ Keep を再読み込みなしで切り替え
 - ページのタイトルと SPA（`pushState`）の URL に追従
 - HTTP エラー、ログイン画面、Cloudflare の確認では「タブで開く」付きの案内バーを表示
+  - モバイル表示で Cloudflare の確認が出たら、ワンクリックでデスクトップ表示に切り替えられる（デスクトップ表示ならパネル内で確認が終わる）
 - パネル内の `document.cookie` を、通常のタブと同じ非 HttpOnly Cookie の見え方に（[#16](https://github.com/hjosugi/sidepanel/issues/16)）
 - 埋め込み禁止のネストした iframe は表示せず除去
 - キーボード操作（↑↓←→、Home/End）、ARIA ラベル、状態の読み上げ
@@ -39,6 +40,8 @@ Chrome 128 以降が必要です。Brave や Edge など Chromium 系のブラ�
 
 Google の一部サービスは `Sec-Fetch-Dest: iframe` をサーバー側で拒否するので、パネル内のフレームではリクエストヘッダーを最上位のナビゲーションと同じ形に書き換えます。これで Google Keep、カレンダー、ドライブ、コンタクト、ToDo リストが開けます（[#1](https://github.com/hjosugi/sidepanel/issues/1)）。
 
+Cloudflare のチャレンジ用フレーム（`challenges.cloudflare.com`）にはモバイル UA を送りません。Turnstile は自分のフレームの `User-Agent` ヘッダーと `navigator.userAgent` を照合するため、ここでヘッダーを書き換えると確認が終わらなくなります（[#17](https://github.com/hjosugi/sidepanel/issues/17)）。
+
 | 権限 | 理由 |
 | --- | --- |
 | `sidePanel` | サイドパネルを表示する |
@@ -54,7 +57,8 @@ Google の一部サービスは `Sec-Fetch-Dest: iframe` をサーバー側で�
 
 ## 制限
 
-- iframe 内で完結しないサイト（Google のログイン、ChatGPT などの Cloudflare チャレンジ、[#17](https://github.com/hjosugi/sidepanel/issues/17)）は、↗ や案内バーからタブで開いてください
+- iframe 内で完結しないサイト（Google のログイン）は、↗ や案内バーからタブで開いてください
+- Cloudflare の確認（ChatGPT など）はデスクトップ表示でしか終わりません。モバイル表示ではページとそのスクリプトが別々の UA を送るためです。案内バーの「デスクトップ表示」か 📱/🖥 で切り替えてください（[#17](https://github.com/hjosugi/sidepanel/issues/17)）
 - `X-Frame-Options` を外すのは安全ですが、`frame-ancestors` を含む CSP は DNR で一部だけ書き換えられないため**ヘッダー全体**を外します（パネル直下のフレームのみ）
 - パネルは 1 つの文書なので、履歴はすべてのページで共通です。‹ は表示中のページを必ず戻しますが、それより後に遷移した非表示のページもその時点の状態に戻ります
 - HttpOnly Cookie は `document.cookie` に出しません。初回の読み込みでは Cookie の反映が数 ms 遅れることがあり、次回のために `sessionStorage` にキャッシュします
