@@ -3,6 +3,8 @@
 
 # Sidepanel Bookmarks
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/idjfdgpakkmopepemimbpaaippmichdf?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf)
+
 A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and opens pages **inside the panel**, like the Edge sidebar. The UI is English by default and can be switched to Japanese at runtime.
 
 ## Features
@@ -26,7 +28,7 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 
 ## Install
 
-The Chrome Web Store listing is in preparation ([docs/RELEASE.md](docs/RELEASE.md)). Until then:
+Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf). The first version is still in review, so the page opens only after it is approved. Until then:
 
 1. Download the zip from [Releases](https://github.com/hjosugi/sidepanel/releases) and extract it (or `git clone`)
 2. Open `chrome://extensions`, turn on **Developer mode**

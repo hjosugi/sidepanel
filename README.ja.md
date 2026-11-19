@@ -3,6 +3,8 @@
 
 # Sidepanel Bookmarks
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/idjfdgpakkmopepemimbpaaippmichdf?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf)
+
 Chrome のサイドパネルにブックマークを並べ、クリックしたページを**そのままパネル内で**開く、ビルド不要の Chrome MV3 拡張機能です（Edge のサイドバーのような使い方）。UI は英語が既定で、実行中に日本語へ切り替えられます。
 
 ## 機能
@@ -25,7 +27,7 @@ Chrome のサイドパネルにブックマークを並べ、クリックした�
 
 ## インストール
 
-Chrome ウェブストアへの掲載を準備中です（[docs/RELEASE.ja.md](docs/RELEASE.ja.md)）。それまでは:
+[Chrome ウェブストア](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf)からインストールできます。初回の審査中のため、ページは承認後に開けるようになります。それまでは:
 
 1. [Releases](https://github.com/hjosugi/sidepanel/releases) から zip をダウンロードして展開（または `git clone`）
 2. `chrome://extensions` を開き、**デベロッパーモード**をオン
