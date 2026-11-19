@@ -7,7 +7,7 @@ How the extension goes from `main` to GitHub Releases and the Chrome Web Store.
 
 ## Listing
 
-- Store page: not published yet. After the first submission, record the item ID here and in the README badge
+- Store page: <https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf> (item ID `idjfdgpakkmopepemimbpaaippmichdf`). The first version is in review; the page opens once it is approved
 - Privacy policy: `docs/PRIVACY.md`. The listing links to its GitHub URL, so do not move or rename it
 - Support: GitHub issues
 
