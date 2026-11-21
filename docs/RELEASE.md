@@ -62,7 +62,7 @@ Not in `release:check`, because they depend on real sites:
 - `pnpm run compat`: request status and embedding headers of popular sites with `Sec-Fetch-Dest: iframe` (also runs weekly in the Site compatibility workflow)
 - `PROFILE_DIR=… node scripts/site-probe.mjs`: open real sites in the side panel with a copy of a signed-in profile. `HEADED=1` shows the window (Cloudflare tends to flag headless browsers), `SITES=ChatGPT,Claude` limits the sites (URLs work too). When a Cloudflare check offers desktop layout, the probe switches and reports the result again
 
-Before a release that changes framing, cookies or navigation, check by hand: load the unpacked extension, sign in to a few sites (mail, calendar, an AI chat), open them in the panel, switch pages with the tab strip, and use back / reload / open in tab.
+Before a release that changes framing, cookies or navigation, check by hand: load the unpacked extension, sign in to a few sites (mail, calendar, an AI chat), open them in the panel, switch pages with the icon bar, and use back / reload / open in tab and the address bar.
 
 ## Zip
 
