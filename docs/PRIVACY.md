@@ -6,20 +6,24 @@
 Sidepanel Bookmarks is a Chrome extension that shows the user's bookmarks in the
 side panel and opens them inside the side panel.
 
-Last updated: 2026-11-14
+Last updated: 2026-11-22
 
 ## Data Processed
 
 The extension processes the following data locally in the browser:
 
 - Bookmarks, to show them as a tree and to search them
+- The URL and title of the `http(s)` tabs open in the current window, to list and
+  search them in the side panel; they are read when the list is shown and are not
+  stored
 - The URL and title of pages opened in the side panel, to show them in the panel
-  header and tab strip; the last URL is remembered so the panel can reopen it
+  header and icon bar; the last URL is remembered so the panel can reopen it
 - Cookies of the site open in the side panel (see below)
 - Response headers of side-panel frames, to detect errors and to remove nested
   frames that a site does not allow to be embedded
-- Extension settings: language, mobile layout, number of pages kept open, and
-  sites shown in desktop layout
+- Extension settings: language, mobile layout, number of pages kept open, the page
+  shown when the panel opens, pinned sites (URL and name), sites shown in desktop
+  layout, and sites shown as in a normal tab
 
 ## Local Processing
 
@@ -49,6 +53,9 @@ rules are removed when the last side panel closes.
 
 Settings are saved in `chrome.storage.local`. The open/closed state of bookmark
 folders and the last opened page are saved in the extension's `localStorage`.
+For the sites shown as in a normal tab (Claude by default), the positions of the
+frame checks in that site's script files are remembered in that site's
+`localStorage` under `spb:unframe`, so the scripts do not have to be read again.
 Nothing is synced or uploaded.
 
 ## Remote Code

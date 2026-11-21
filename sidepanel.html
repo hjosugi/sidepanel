@@ -8,11 +8,15 @@
 </head>
 <body class="list">
 <header>
-  <button id="menu" data-i18n-title="menu.label" data-i18n-aria-label="menu.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg></button>
+  <button id="menu" aria-controls="list" aria-expanded="true" data-i18n-title="menu.label" data-i18n-aria-label="menu.label">
+    <svg class="open" aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
+    <svg class="close" aria-hidden="true" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+  </button>
   <button id="back" disabled data-i18n-title="back.label" data-i18n-aria-label="back.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
   <button id="fwd" disabled data-i18n-title="forward.label" data-i18n-aria-label="forward.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
   <button id="reload" disabled data-i18n-title="reload.label" data-i18n-aria-label="reload.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 2.5v3h-3"/></svg></button>
-  <span id="title"></span>
+  <input id="address" type="text" inputmode="url" autocomplete="off" spellcheck="false" enterkeyhint="go" data-i18n-placeholder="address.placeholder" data-i18n-aria-label="address.label">
+  <button id="pin" disabled aria-pressed="false" data-i18n-title="pin.add" data-i18n-aria-label="pin.add"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2 14 6.5l-1.5.5-2.5 2.5.5 3-1 1-7-7 1-1 3 .5L9 3.5z"/><path d="m2.5 13.5 3-3"/></svg></button>
   <button id="ua" disabled hidden data-mode="mobile" data-i18n-title="mobile.label" data-i18n-aria-label="mobile.label">
     <svg class="phone" aria-hidden="true" viewBox="0 0 16 16"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>
     <svg class="desktop" aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M5.5 14h5M8 11.5V14"/></svg>
@@ -20,7 +24,7 @@
   <button id="lang" title="言語 / Language" aria-label="言語 / Language">EN</button>
   <button id="popout" disabled data-i18n-title="popout.label" data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
 </header>
-<div id="tabs" hidden></div>
+<div id="dock" role="group" hidden data-i18n-aria-label="dock.label"></div>
 <div id="progress" aria-hidden="true"></div>
 <div id="notice" hidden role="status" aria-live="polite">
   <span id="notice-text"></span>

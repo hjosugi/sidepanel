@@ -13,6 +13,8 @@ export const PACKAGE_FILES = [
   'sidepanel.js',
   'viewer.js',
   'bookmarks.js',
+  'tabs.js',
+  'urls.js',
   'cookies.js',
   'embedding.js',
   'net.js',
@@ -23,5 +25,6 @@ export const PACKAGE_FILES = [
   'spa.js',
   'ua.js',
   'cookie-shim.js',
+  'unframe.js',
   'LICENSE',
 ];

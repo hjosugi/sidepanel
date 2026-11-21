@@ -58,7 +58,29 @@ async function openBookmark(url) {
 }
 
 async function title() {
-  return panel.evaluate('document.getElementById("title").textContent');
+  return panel.evaluate('document.getElementById("address").value');
+}
+
+async function settingsValue(key) {
+  return panel.evaluate(
+    `chrome.storage.local.get('settings').then(({ settings }) => settings?.[${JSON.stringify(key)}])`,
+  );
+}
+
+async function patchSettings(patch) {
+  await panel.evaluate(`(async () => {
+    const { settings = {} } = await chrome.storage.local.get('settings');
+    await chrome.storage.local.set({ settings: { ...settings, ...${JSON.stringify(patch)} } });
+    await chrome.runtime.sendMessage({ type: 'settings-changed' });
+  })()`);
+  await sleep(200);
+}
+
+async function ensureList(open) {
+  if ((await panel.evaluate('document.body.classList.contains("list")')) !== open) {
+    await panel.evaluate('document.getElementById("menu").click()');
+    await sleep(400);
+  }
 }
 
 try {
@@ -107,7 +129,7 @@ try {
   check(
     'toolbar buttons have accessible names',
     await panel.evaluate(
-      `(() => ['menu','back','fwd','reload','popout'].every((id) => document.getElementById(id).getAttribute('aria-label')))()`,
+      `(() => ['menu','back','fwd','reload','pin','address','popout'].every((id) => document.getElementById(id).getAttribute('aria-label')))()`,
     ),
   );
 
@@ -297,17 +319,17 @@ try {
     pageALogs.length === 1,
     `requests=${pageALogs.length}`,
   );
-  const tabCount = await panel.evaluate("document.querySelectorAll('#tabs button').length");
-  check('#11 tab strip lists the open pages', tabCount >= 2, `tabs=${tabCount}`);
+  const tabCount = await panel.evaluate("document.querySelectorAll('#dock .dock-item').length");
+  check('#11 dock lists the open pages', tabCount >= 2, `pages=${tabCount}`);
   const switched = await panel.evaluate(`(() => {
-    const button = [...document.querySelectorAll('#tabs button')].find((item) => item.title.startsWith(${JSON.stringify(base2)}));
+    const button = [...document.querySelectorAll('#dock .dock-item')].find((item) => item.dataset.url.startsWith(${JSON.stringify(base2)}));
     if (!button) return false;
     button.click();
     return true;
   })()`);
   await sleep(300);
   check(
-    '#11 tab strip switches pages without reloading',
+    '#11 dock switches pages without reloading',
     switched && (await logs()).logs.filter((entry) => entry.path === '/page-b').length === 1,
   );
 
@@ -318,21 +340,56 @@ try {
   await addBookmark(`${base2}/spa`, 'SPA 2');
   await openBookmark(`${base2}/spa`);
   await waitFor(async () => (await title()) === 'SPA Next', { timeout: 5000 }).catch(() => {});
-  await panel.evaluate(`[...document.querySelectorAll('#tabs button')]
-    .find((item) => item.title.startsWith(${JSON.stringify(server.base)})).click()`);
+  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
+    .find((item) => item.dataset.url.startsWith(${JSON.stringify(server.base)})).click()`);
   await sleep(200);
   await panel.evaluate('document.getElementById("back").click()');
   await waitFor(
     async () =>
-      new URL(await panel.evaluate('document.getElementById("title").title')).pathname === '/spa',
+      new URL(await panel.evaluate('document.getElementById("address").title')).pathname === '/spa',
     { timeout: 3000 },
   ).catch(() => {});
-  const visibleAfterBack = await panel.evaluate('document.getElementById("title").title');
+  const visibleAfterBack = await panel.evaluate('document.getElementById("address").title');
   check(
     '#11 back moves the visible page',
     new URL(visibleAfterBack).pathname === '/spa',
     visibleAfterBack,
   );
+
+  // pins: the pin button adds the page to the dock, and the pin reopens it
+  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
+    .find((item) => item.dataset.url.startsWith(${JSON.stringify(base2)})).click()`);
+  await sleep(300);
+  await panel.evaluate('document.getElementById("pin").click()');
+  await sleep(300);
+  const pins = await settingsValue('pins');
+  check(
+    'pin button pins the current page',
+    pins?.length === 1 &&
+      pins[0].url.startsWith(base2) &&
+      (await panel.evaluate('document.getElementById("pin").getAttribute("aria-pressed")')) ===
+        'true',
+    JSON.stringify(pins),
+  );
+  check(
+    'pinned page shows as an icon in the dock',
+    await panel.evaluate(`(() => {
+      const item = document.querySelector('#dock .dock-item[data-pin="0"]');
+      return Boolean(item?.querySelector('img')?.src.includes('/_favicon/')) && item.hasAttribute('data-alive');
+    })()`),
+  );
+  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
+    .find((item) => item.dataset.url.startsWith(${JSON.stringify(server.base)})).click()`);
+  await sleep(300);
+  await panel.evaluate('document.querySelector(\'#dock .dock-item[data-pin="0"]\').click()');
+  await sleep(300);
+  check(
+    'clicking a pin shows its page',
+    (await panel.evaluate('document.getElementById("address").title')).startsWith(base2),
+  );
+  await panel.evaluate('document.getElementById("pin").click()');
+  await sleep(300);
+  check('pin button unpins the page', (await settingsValue('pins'))?.length === 0);
 
   // options page: page limit applies to the open panel
   const optionsTab = await newTab(brave.port, `chrome-extension://${id}/options.html`);
@@ -351,7 +408,7 @@ try {
   check(
     'options: lowering the page limit closes older pages',
     (await panel.evaluate("document.querySelectorAll('#frames iframe').length")) === 1 &&
-      (await panel.evaluate('document.getElementById("tabs").hidden')),
+      (await panel.evaluate('document.getElementById("dock").hidden')),
   );
   await options.evaluate(`(() => {
     const pages = document.getElementById('pages');
@@ -544,6 +601,149 @@ try {
     '#15 second Esc closes the list',
     (await panel.evaluate('document.body.classList.contains("list")')) === false,
   );
+
+  // the menu button turns into a close button while the list is open
+  await ensureList(true);
+  const menuOpen = await panel.evaluate(`(() => {
+    const menu = document.getElementById('menu');
+    return {
+      expanded: menu.getAttribute('aria-expanded'),
+      close: getComputedStyle(menu.querySelector('.close')).display,
+      open: getComputedStyle(menu.querySelector('.open')).display,
+    };
+  })()`);
+  await ensureList(false);
+  const menuClosed = await panel.evaluate(`(() => {
+    const menu = document.getElementById('menu');
+    return {
+      expanded: menu.getAttribute('aria-expanded'),
+      close: getComputedStyle(menu.querySelector('.close')).display,
+      open: getComputedStyle(menu.querySelector('.open')).display,
+    };
+  })()`);
+  check(
+    'menu shows a close icon while the list is open',
+    menuOpen.expanded === 'true' &&
+      menuOpen.close !== 'none' &&
+      menuOpen.open === 'none' &&
+      menuClosed.expanded === 'false' &&
+      menuClosed.close === 'none' &&
+      menuClosed.open !== 'none',
+    JSON.stringify({ menuOpen, menuClosed }),
+  );
+
+  // address bar: a typed address opens in the panel, other text searches the list
+  await reset();
+  const typed = `${server.base}/typed?x=1`;
+  await panel.evaluate(`(() => {
+    const address = document.getElementById('address');
+    address.focus();
+    address.value = ${JSON.stringify(typed.replace(/^http:\/\//, ''))};
+    address.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  })()`);
+  await waitFor(async () => (await title()) === '/typed', { timeout: 5000 }).catch(() => {});
+  check(
+    'address bar opens a typed address',
+    (await title()) === '/typed' &&
+      (await panel.evaluate('document.getElementById("address").title')) === typed &&
+      !(await panel.evaluate('document.body.classList.contains("list")')),
+    `title=${await title()}`,
+  );
+  await panel.evaluate(`(() => {
+    const address = document.getElementById('address');
+    address.focus();
+    address.value = 'SecFetch';
+    address.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  })()`);
+  await sleep(500);
+  check(
+    'address bar searches the list for other text',
+    await panel.evaluate(
+      `document.body.classList.contains('list') && document.getElementById('q').value === 'SecFetch' &&
+        [...document.querySelectorAll('#tree .bm')].some((a) => a.textContent === 'SecFetch')`,
+    ),
+  );
+  await panel.evaluate(`(() => {
+    const q = document.getElementById('q');
+    q.value = '';
+    q.dispatchEvent(new Event('input'));
+  })()`);
+  await sleep(300);
+
+  // open browser tabs are listed and open in the panel
+  const tabUrl = `${server.base}/tab-source`;
+  const browserTab = await newTab(brave.port, tabUrl);
+  await waitFor(
+    () =>
+      panel.evaluate(
+        `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)})`,
+      ),
+    { timeout: 5000 },
+  ).catch(() => {});
+  check(
+    'list shows open browser tabs',
+    await panel.evaluate(
+      `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)} && a.textContent === '/tab-source')`,
+    ),
+  );
+  await panel.evaluate(`(() => {
+    const q = document.getElementById('q');
+    q.value = 'tab-source';
+    q.dispatchEvent(new Event('input'));
+  })()`);
+  await sleep(500);
+  check(
+    'search finds open browser tabs',
+    await panel.evaluate(
+      `[...document.querySelectorAll('#tree details.tabs .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)})`,
+    ),
+  );
+  await panel.evaluate(
+    `[...document.querySelectorAll('#tree .bm.tab')].find((a) => a.href === ${JSON.stringify(tabUrl)}).click()`,
+  );
+  await waitFor(async () => (await title()) === '/tab-source', { timeout: 5000 }).catch(() => {});
+  check('clicking a tab opens it in the panel', (await title()) === '/tab-source');
+  await closeTarget(brave.port, browserTab.id);
+  await panel.evaluate(`(() => {
+    const q = document.getElementById('q');
+    q.value = '';
+    q.dispatchEvent(new Event('input'));
+  })()`);
+
+  // sites in unframedHosts see themselves as the top frame; other sites still see the frame
+  await patchSettings({ unframedHosts: ['127.0.0.1'] });
+  await addBookmark(`${server.base}/frame-check`, 'Frame check');
+  await openBookmark(`${server.base}/frame-check`);
+  await waitFor(async () => (await title()) !== 'pending', { timeout: 5000 }).catch(() => {});
+  const unframedTitle = await title();
+  await addBookmark(`${base2}/frame-check`, 'Frame check 2');
+  await openBookmark(`${base2}/frame-check`);
+  await waitFor(async () => (await title()) !== 'pending', { timeout: 5000 }).catch(() => {});
+  const framedTitle = await title();
+  check(
+    'unframed site sees itself as the top frame, self still works',
+    unframedTitle === 'top|top|ok',
+    unframedTitle,
+  );
+  check('other sites still see the frame', framedTitle === 'framed|framed|ok', framedTitle);
+  await patchSettings({ unframedHosts: ['claude.ai'] });
+
+  // startup: a specific page opens when the panel opens
+  await patchSettings({ startup: 'url', startUrl: `${server.base}/start` });
+  const startTab = await newTab(brave.port, `chrome-extension://${id}/sidepanel.html`);
+  const startTarget = await waitFor(async () => {
+    const target = (await listTargets(brave.port)).find((item) => item.id === startTab.id);
+    return target?.webSocketDebuggerUrl ? target : null;
+  });
+  const startPage = await Cdp.connect(startTarget.webSocketDebuggerUrl);
+  const startSrc = await waitFor(
+    () => startPage.evaluate("document.querySelector('#frames iframe')?.src ?? null"),
+    { timeout: 5000 },
+  ).catch(() => null);
+  startPage.close();
+  await closeTarget(brave.port, startTab.id);
+  check('startup opens the chosen page', startSrc === `${server.base}/start`, String(startSrc));
+  await patchSettings({ startup: 'last', startUrl: '' });
 
   // language switch
   await panel.evaluate('document.getElementById("lang").click()');

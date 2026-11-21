@@ -1,7 +1,9 @@
 import { applyRules, clearRules, RULE_IDS } from './rules.js';
 import { getSettings } from './store.js';
 
-const SCRIPT_IDS = ['tracker', 'spa', 'ua', 'cookie'];
+const SCRIPT_IDS = ['tracker', 'spa', 'ua', 'cookie', 'unframe'];
+
+const hostMatches = (hosts) => hosts.flatMap((host) => [`*://${host}/*`, `*://*.${host}/*`]);
 
 function enableActionClick() {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
@@ -30,10 +32,7 @@ function contentScripts(settings) {
     contentScript('cookie', 'cookie-shim.js', 'MAIN'),
   ];
   if (settings.mobileUA) {
-    const excludeMatches = settings.desktopHosts.flatMap((host) => [
-      `*://${host}/*`,
-      `*://*.${host}/*`,
-    ]);
+    const excludeMatches = hostMatches(settings.desktopHosts);
     scripts.push(
       contentScript('ua', 'ua.js', 'MAIN', excludeMatches.length ? { excludeMatches } : {}),
     );
@@ -41,18 +40,33 @@ function contentScripts(settings) {
   return scripts;
 }
 
+// 登録していない ID を渡すと呼び出し全体が失敗するので、登録済みのものだけを外す
 async function unregisterContentScripts() {
-  await chrome.scripting.unregisterContentScripts({ ids: SCRIPT_IDS }).catch(() => {});
+  const registered = await chrome.scripting.getRegisteredContentScripts().catch(() => []);
+  const ids = registered.map((script) => script.id).filter((id) => SCRIPT_IDS.includes(id));
+  if (ids.length) await chrome.scripting.unregisterContentScripts({ ids }).catch(() => {});
+}
+
+async function register(scripts) {
+  try {
+    await chrome.scripting.registerContentScripts(scripts);
+  } catch (error) {
+    console.warn('Failed to register content scripts', error);
+  }
 }
 
 async function enable() {
   const settings = await getSettings();
   await applyRules(settings);
   await unregisterContentScripts();
-  try {
-    await chrome.scripting.registerContentScripts(contentScripts(settings));
-  } catch (error) {
-    console.warn('Failed to register content scripts', error);
+  await register(contentScripts(settings));
+  // サイトの指定に問題があっても、ほかのスクリプトは登録されたままにする
+  if (settings.unframedHosts.length) {
+    await register([
+      contentScript('unframe', 'unframe.js', 'MAIN', {
+        matches: hostMatches(settings.unframedHosts),
+      }),
+    ]);
   }
   return settings;
 }
