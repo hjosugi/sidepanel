@@ -132,6 +132,23 @@ export async function startServer() {
       return;
     }
 
+    // claude.ai と同じく self と top を比べて iframe の中かを判定する。
+    // 比較の順序が逆の場合と、self のほかの使い方が壊れていないかも見る
+    if (path === '/frame-check') {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end('<!doctype html><title>pending</title><script src="/frame-check.js"></script>');
+      return;
+    }
+    if (path === '/frame-check.js') {
+      res.writeHead(200, { 'content-type': 'text/javascript' });
+      res.end(`const framed = window.self !== window.top;
+const reversed = top != self;
+const intact = self === window && typeof self.addEventListener === 'function' && self.location.href === location.href;
+document.title = [framed ? 'framed' : 'top', reversed ? 'framed' : 'top', intact ? 'ok' : 'broken'].join('|');
+`);
+      return;
+    }
+
     if (path === '/slow') {
       setTimeout(() => {
         res.writeHead(200, { 'content-type': 'text/html' });

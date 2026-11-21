@@ -9,14 +9,19 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 
 ## Features
 
-- Open/close the side panel from the toolbar button, or toggle the bookmark list with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>
+- Open/close the side panel from the toolbar button, or toggle the list with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>
 - Browse bookmarks as a folder tree (open/closed state is remembered)
-- Search bookmarks (Enter opens the first match, "Show more" reveals the rest)
+- The tabs open in the current window are listed above the bookmarks, so a tab can be opened in the panel too. Ctrl / Cmd / Shift / middle click switches to that tab instead
+- Search bookmarks and open tabs (Enter opens the first match, or the typed address when nothing matches; "Show more" reveals the rest)
 - Open a bookmark in the panel; Ctrl / Cmd / Shift / middle click still opens a normal tab
-- Toolbar: ☰ list, ‹ › back/forward, ⟳ reload, ↗ open current page in a tab
+- Toolbar: ☰ list (✕ while the list is open), ‹ › back/forward, ⟳ reload, address bar, 📌 pin, ↗ open current page in a tab
+- Address bar: shows the page title; click it (or press <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>D</kbd>) to edit the URL. Enter opens an address such as `example.com` in the panel; other text searches bookmarks and tabs
+- Pin sites like the Edge sidebar: pinned sites sit as favicons under the toolbar, open pages show a dot and the visible one is underlined. Drag icons to reorder; middle click closes an open page
+- Choose what the panel shows when it opens: the last page, bookmarks and tabs, or a specific page (like a home page)
 - Mobile layout by default: a mobile UA, Client Hints, and `navigator.userAgent` are used to fit the narrow panel
   - Toggle 🖥/📱 per site; the choice is remembered
-- Keep several pages alive (3 by default, 1–5 in Settings). A tab strip appears for open pages, so Gmail ⇄ Claude ⇄ Keep switches without reloading
+- Keep several pages alive (3 by default, 1–5 in Settings). Open pages appear as icons next to the pins, so Gmail ⇄ Claude ⇄ Keep switches without reloading
+- Claude's chat list works in the panel: Claude hides it inside frames, so for the sites in Settings (Claude by default) the panel hides that the page is in a frame
 - Page titles and SPA (`pushState`) URLs are tracked from a content script
 - Fallback bar for HTTP errors, sign-in pages and Cloudflare checks, with "Open in tab"
   - A Cloudflare check in mobile layout offers a one-click switch to desktop layout, where the check can finish inside the panel
@@ -24,7 +29,7 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
   (see [#16](https://github.com/hjosugi/sidepanel/issues/16))
 - Nested iframes that would otherwise be blocked are removed instead of being exposed
 - Keyboard navigation (↑↓←→, Home/End), ARIA labels, live status messages
-- Settings page (the sliders button next to the search box, or the extension's Options): language, mobile layout, pages kept open, sites shown in desktop layout
+- Settings page (the sliders button next to the search box, or the extension's Options): language, mobile layout, pages kept open, startup page, pinned sites, sites shown in desktop layout, sites shown as in a normal tab
 
 ## Install
 
@@ -51,7 +56,7 @@ The mobile UA is never sent to Cloudflare's challenge frame (`challenges.cloudfl
 | `bookmarks` | Read bookmarks |
 | `favicon` | Show site icons |
 | `declarativeNetRequestWithHostAccess` + `<all_urls>` | Remove embedding blockers and set the mobile UA only in panel frames |
-| `scripting` | Inject the URL/title tracker, SPA hook, UA shim and cookie shim while the panel is open |
+| `scripting` | Inject the URL/title tracker, SPA hook, UA shim, cookie shim and frame-check shim while the panel is open |
 | `storage` | Store settings shared with the background worker |
 | `webRequest` | Observe the current frame URLs, HTTP failures and the original embedding headers (read-only) |
 | `cookies` | Give panel frames the same non-HttpOnly view of `document.cookie` as a normal tab |
@@ -68,6 +73,9 @@ The extension itself has no runtime dependencies, no build step, no analytics an
 - Incognito windows and bookmarklets (`javascript:`) are not supported. `chrome://` pages open in a tab.
 - The last visited URL is restored, including SPA navigations; it is not necessarily the bookmark's original URL.
 - Mobile UA is a heuristic. Use the 📱/🖥 button for sites that expect a desktop layout.
+- The open tab list reads the tabs of the current window only, and lists only `http(s)` tabs.
+- The frame-check shim answers only `self` / `top` comparisons written in the site's script files, which is how Claude checks. A site that checks in another way, or in an inline script, still sees the frame. On the first load of a new script version it reads that script again from the HTTP cache, and remembers the result in the site's `localStorage` (`spb:unframe`).
+- One frame is kept per site, so a pin stands for its whole site: browsing to another page of a pinned site still shows that pin as active.
 
 ## Development
 
@@ -80,8 +88,8 @@ npm run release:zip     # release:check, then .release/ artifacts
 | Command | What it does |
 | --- | --- |
 | `npm run lint` | Biome, plus manifest / packaged-file / i18n checks |
-| `npm run test:unit` | Pure functions: rules, embedding check, cookie parsing, settings |
-| `npm test` | Loads the extension into headless Brave (or `BROWSER_BIN`), opens the real side panel and checks DNR headers, SPA tracking, mobile UA, fallbacks, nested-frame blocking, the cookie shim, settings and rule cleanup against a local server |
+| `npm run test:unit` | Pure functions: rules, embedding check, cookie parsing, settings, address parsing and pin matching |
+| `npm test` | Loads the extension into headless Brave (or `BROWSER_BIN`), opens the real side panel and checks DNR headers, SPA tracking, mobile UA, fallbacks, nested-frame blocking, the cookie shim, the frame-check shim, the address bar, open tabs, pins, the startup page, settings and rule cleanup against a local server |
 | `npm run release:package` | Only build `.release/sidepanel-bookmarks-vX.Y.Z.zip` and its checksum, metadata, notes and tester guide |
 | `npm run release:store:assets` | Render store screenshots and the promo tile into `.release/store-assets/` |
 | `npm run version:set -- X.Y.Z` | Set the version in `package.json`, `package-lock.json` and `manifest.json` |

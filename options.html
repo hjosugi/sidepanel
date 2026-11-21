@@ -30,9 +30,37 @@
   </div>
   <p id="pages-hint" class="hint" data-i18n="options.pages.hint"></p>
 
+  <h2 id="startup-heading" data-i18n="options.startup"></h2>
+  <div class="choices" role="radiogroup" aria-labelledby="startup-heading">
+    <label><input type="radio" name="startup" value="last"><span data-i18n="options.startup.last"></span></label>
+    <label><input type="radio" name="startup" value="list"><span data-i18n="options.startup.list"></span></label>
+    <label><input type="radio" name="startup" value="url"><span data-i18n="options.startup.url"></span></label>
+  </div>
+  <form id="start-form" class="field">
+    <input id="start-url" type="text" inputmode="url" list="start-suggestions" autocomplete="off" spellcheck="false" placeholder="https://" data-i18n-aria-label="options.startUrl" aria-describedby="start-error">
+    <button id="start-current" type="button" data-i18n="options.startUrl.current"></button>
+  </form>
+  <datalist id="start-suggestions"></datalist>
+  <p id="start-error" class="hint error" data-i18n="options.startUrl.invalid" hidden></p>
+
+  <h2 id="pins-heading" data-i18n="options.pins"></h2>
+  <p class="hint" data-i18n="options.pins.hint"></p>
+  <ul id="pins" class="list" aria-labelledby="pins-heading"></ul>
+  <p id="pins-empty" class="hint" data-i18n="options.pins.empty" hidden></p>
+
   <h2 id="desktop-heading" data-i18n="options.desktop"></h2>
-  <ul id="desktop" aria-labelledby="desktop-heading"></ul>
+  <ul id="desktop" class="list" aria-labelledby="desktop-heading"></ul>
   <p id="desktop-empty" class="hint" data-i18n="options.desktop.empty" hidden></p>
+
+  <h2 id="unframed-heading" data-i18n="options.unframed"></h2>
+  <p class="hint" data-i18n="options.unframed.hint"></p>
+  <ul id="unframed" class="list" aria-labelledby="unframed-heading"></ul>
+  <p id="unframed-empty" class="hint" data-i18n="options.unframed.empty" hidden></p>
+  <form id="unframed-form" class="field">
+    <input id="unframed-host" type="text" autocomplete="off" spellcheck="false" placeholder="example.com" data-i18n-aria-label="options.unframed.label" aria-describedby="unframed-error">
+    <button type="submit" data-i18n="options.unframed.add"></button>
+  </form>
+  <p id="unframed-error" class="hint error" data-i18n="options.unframed.invalid" hidden></p>
 
   <p id="status" role="status" aria-live="polite"></p>
 </main>

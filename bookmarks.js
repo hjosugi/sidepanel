@@ -1,7 +1,11 @@
 import { t } from './i18n.js';
 import { readLocal, writeLocal } from './store.js';
+import { createTabs } from './tabs.js';
+import { favicon, toUrl } from './urls.js';
 
 const SEARCH_PAGE = 200;
+// 開いているタブのフォルダ。ブックマークの ID は数字なので重ならない
+const TABS_ID = 'tabs';
 
 export function createBookmarks({ onOpen }) {
   const q = document.getElementById('q');
@@ -17,6 +21,9 @@ export function createBookmarks({ onOpen }) {
   let searchState = null;
   let rootCache = new Map();
   let timer;
+  let tabsTimer;
+  let tabsOpen = readLocal('tabsOpen', true) !== false;
+  const tabs = createTabs({ onChange: scheduleTabsRender });
 
   const visible = () => document.body.classList.contains('list');
 
@@ -28,8 +35,10 @@ export function createBookmarks({ onOpen }) {
     writeLocal('open', [...expanded]);
   }
 
-  function favicon(url, size) {
-    return `/_favicon/?pageUrl=${encodeURIComponent(url)}&size=${size}`;
+  function setIcon(img, url) {
+    const small = favicon(url, 16);
+    img.src = small;
+    img.srcset = `${small} 1x, ${favicon(url, 32)} 2x`;
   }
 
   function item(node) {
@@ -37,10 +46,7 @@ export function createBookmarks({ onOpen }) {
       const a = bmTemplate.content.firstElementChild.cloneNode(true);
       a.dataset.id = node.id;
       a.querySelector('span').textContent = node.title || node.url;
-      const img = a.querySelector('img');
-      const small = favicon(node.url, 16);
-      img.src = small;
-      img.srcset = `${small} 1x, ${favicon(node.url, 32)} 2x`;
+      setIcon(a.querySelector('img'), node.url);
       if (/^javascript:/i.test(node.url)) {
         a.removeAttribute('href');
         a.classList.add('unsupported');
@@ -87,10 +93,41 @@ export function createBookmarks({ onOpen }) {
       el.removeAttribute('aria-disabled');
     }
     el.title = `${node.title}\n${node.url}`;
-    const img = el.querySelector('img');
-    const small = favicon(node.url, 16);
-    img.src = small;
-    img.srcset = `${small} 1x, ${favicon(node.url, 32)} 2x`;
+    setIcon(el.querySelector('img'), node.url);
+  }
+
+  function tabItem(tab) {
+    const a = bmTemplate.content.firstElementChild.cloneNode(true);
+    a.classList.add('tab');
+    a.dataset.tabId = String(tab.id);
+    a.href = tab.url;
+    a.title = `${tab.title}\n${tab.url}`;
+    a.querySelector('span').textContent = tab.title || tab.url;
+    setIcon(a.querySelector('img'), tab.url);
+    return a;
+  }
+
+  function fillTabsFolder(d, list) {
+    for (const el of folderChildren(d)) el.remove();
+    d.querySelector(':scope > summary .count').textContent = String(list.length);
+    d.append(...list.map(tabItem));
+  }
+
+  /** 検索中は常に開く。開閉の状態は検索していないときだけ覚える */
+  function tabsFolder(list, open = tabsOpen) {
+    const d = folderTemplate.content.firstElementChild.cloneNode(true);
+    d.dataset.id = TABS_ID;
+    d.dataset.loaded = '1';
+    d.classList.add('tabs');
+    d.open = open;
+    const summary = d.firstElementChild;
+    summary.querySelector('span').textContent = t('tabs.folder');
+    const count = document.createElement('span');
+    count.className = 'count';
+    summary.append(count);
+    summary.setAttribute('aria-expanded', String(d.open));
+    fillTabsFolder(d, list);
+    return d;
   }
 
   function rows() {
@@ -141,8 +178,11 @@ export function createBookmarks({ onOpen }) {
 
   function renderSearch() {
     if (!searchState) return;
-    const { hits, shown } = searchState;
-    tree.replaceChildren(...hits.slice(0, shown).map(item));
+    const { hits, tabHits, shown } = searchState;
+    tree.replaceChildren(
+      ...(tabHits.length ? [tabsFolder(tabHits, true)] : []),
+      ...hits.slice(0, shown).map(item),
+    );
     if (hits.length > shown) {
       const more = document.createElement('button');
       more.id = 'more';
@@ -166,16 +206,17 @@ export function createBookmarks({ onOpen }) {
     rootCache = new Map();
 
     if (query) {
-      let hits = [];
-      try {
-        hits = (await chrome.bookmarks.search(query)).filter((node) => node.url);
-      } catch {
-        hits = [];
-      }
+      const [hits, tabHits] = await Promise.all([
+        chrome.bookmarks
+          .search(query)
+          .then((nodes) => nodes.filter((node) => node.url))
+          .catch(() => []),
+        tabs.search(query),
+      ]);
       if (seq !== renderSeq) return;
-      searchState = { query, hits, shown: Math.min(hits.length, SEARCH_PAGE) };
+      searchState = { query, hits, tabHits, shown: Math.min(hits.length, SEARCH_PAGE) };
       renderSearch();
-      announce(t('search.count', { count: hits.length }));
+      announce(t('search.count', { count: hits.length + tabHits.length }));
     } else {
       searchState = null;
       let roots = [];
@@ -185,13 +226,14 @@ export function createBookmarks({ onOpen }) {
         roots = [];
       }
       if (seq !== renderSeq) return;
-      const children = await Promise.all(
-        roots.map((root) => chrome.bookmarks.getChildren(root.id).catch(() => [])),
-      );
+      const [children, openTabs] = await Promise.all([
+        Promise.all(roots.map((root) => chrome.bookmarks.getChildren(root.id).catch(() => []))),
+        tabs.list(),
+      ]);
       if (seq !== renderSeq) return;
       const shown = roots.filter((_root, index) => children[index].length);
       for (const [index, root] of shown.entries()) rootCache.set(root.id, children[index]);
-      tree.replaceChildren(...shown.map(item));
+      tree.replaceChildren(...(openTabs.length ? [tabsFolder(openTabs)] : []), ...shown.map(item));
       loadOpenFolders();
       updateEmpty();
     }
@@ -209,6 +251,31 @@ export function createBookmarks({ onOpen }) {
       }
       render();
     }, 150);
+  }
+
+  // タブはよく変わるので、検索していなければタブのフォルダだけ作り直す
+  function scheduleTabsRender() {
+    clearTimeout(tabsTimer);
+    tabsTimer = setTimeout(() => {
+      if (!visible()) {
+        dirty = true;
+        return;
+      }
+      if (q.value.trim()) render();
+      else renderTabs();
+    }, 150);
+  }
+
+  async function renderTabs() {
+    const seq = renderSeq;
+    const openTabs = await tabs.list();
+    if (seq !== renderSeq || q.value.trim()) return;
+    const d = tree.querySelector(`:scope > details[data-id="${TABS_ID}"]`);
+    if (!openTabs.length) d?.remove();
+    else if (d) fillTabsFolder(d, openTabs);
+    else tree.prepend(tabsFolder(openTabs));
+    resetRoving();
+    updateEmpty();
   }
 
   function invalidateFolder(id) {
@@ -357,6 +424,13 @@ export function createBookmarks({ onOpen }) {
       const id = d.dataset.id;
       const summary = d.querySelector(':scope > summary');
       summary?.setAttribute('aria-expanded', String(d.open));
+      if (id === TABS_ID) {
+        if (!q.value.trim()) {
+          tabsOpen = d.open;
+          writeLocal('tabsOpen', tabsOpen);
+        }
+        return;
+      }
       if (d.open) expanded.add(id);
       else expanded.delete(id);
       persistExpanded();
@@ -372,12 +446,26 @@ export function createBookmarks({ onOpen }) {
       if (more) return;
       const a = event.target.closest('.bm');
       if (!a || a.classList.contains('unsupported')) return;
-      if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.ctrlKey || event.metaKey || event.shiftKey) {
+        // タブは新しいタブで開き直さず、そのタブに切り替える
+        if (a.dataset.tabId) {
+          event.preventDefault();
+          tabs.activate(Number(a.dataset.tabId));
+        }
+        return;
+      }
       event.preventDefault();
       onOpen(a.href, a.querySelector('span').textContent);
     },
     true,
   );
+
+  tree.addEventListener('auxclick', (event) => {
+    const a = event.target.closest('.bm.tab');
+    if (!a || event.button !== 1) return;
+    event.preventDefault();
+    tabs.activate(Number(a.dataset.tabId));
+  });
 
   tree.addEventListener('focusin', (event) => {
     const row = event.target.closest('summary, .bm');
@@ -438,10 +526,17 @@ export function createBookmarks({ onOpen }) {
       event.preventDefault();
       rows()[0]?.focus();
     } else if (event.key === 'Enter') {
+      const query = q.value.trim();
+      if (!query) return;
       const first = tree.querySelector('.bm:not(.unsupported)');
+      // 一致するものがなく、URL として読めるならそのページを開く
+      const url = first ? null : toUrl(query);
       if (first) {
         event.preventDefault();
         first.click();
+      } else if (url) {
+        event.preventDefault();
+        onOpen(url, '', { force: true });
       }
     }
   });

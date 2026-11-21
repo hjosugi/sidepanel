@@ -20,7 +20,9 @@ const settings = prepared?.settings ?? (await getSettings());
 setLang(settings.lang ?? 'en');
 
 let viewer;
-const bookmarks = createBookmarks({ onOpen: (url, name) => viewer.openUrl(url, name) });
+const bookmarks = createBookmarks({
+  onOpen: (url, name, options) => viewer.openUrl(url, name, options),
+});
 
 viewer = createViewer({
   settings,
@@ -28,8 +30,10 @@ viewer = createViewer({
   onLanguageChange: () => bookmarks.updateLanguage(),
 });
 
+// ホームページのように、パネルを開いたときに表示するものを設定で選べる
 const last = readLocal('last', null);
-if (last?.url) viewer.openUrl(last.url, last.name ?? '');
+if (settings.startup === 'url' && settings.startUrl) viewer.openUrl(settings.startUrl);
+else if (settings.startup === 'last' && last?.url) viewer.openUrl(last.url, last.name ?? '');
 else viewer.showList(true);
 
 chrome.runtime.onMessage.addListener((message) => {
