@@ -171,9 +171,9 @@ writeFileSync(
 
 ## Validation
 
-- Biome, manifest, packaged-file and i18n lint: \`npm run release:check\`
-- Unit tests: \`npm run release:check\`
-- Headless side panel smoke test: \`npm run release:check\` (CI also runs it on the unpacked zip)
+- Biome, manifest, packaged-file and i18n lint: \`pnpm run release:check\`
+- Unit tests: \`pnpm run release:check\`
+- Headless side panel smoke test: \`pnpm run release:check\` (CI also runs it on the unpacked zip)
 - Zip integrity and content comparison: \`scripts/package-extension.mjs\`
 
 ## Manual Smoke Test

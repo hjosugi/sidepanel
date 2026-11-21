@@ -4,5 +4,5 @@
 
 ## Verification
 
-- [ ] `npm run release:check`
+- [ ] `pnpm run release:check`
 - [ ] Manual check in the side panel, when relevant

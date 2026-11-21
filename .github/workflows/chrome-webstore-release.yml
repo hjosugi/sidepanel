@@ -83,11 +83,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Reads the pnpm version from packageManager in package.json
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
           node-version: "24"
-          cache: npm
+          cache: pnpm
 
       # A push publishes when it is a vX.Y.Z tag, or a main push whose version has
       # no tag yet; the github-release job then tags that commit. The store steps
@@ -142,7 +146,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       # Branded Google Chrome ignores --load-extension since 137, so use Chrome for Testing.
       - name: Install Chrome for Testing
@@ -172,25 +176,25 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && steps.target.outputs.build == 'true' && inputs.version != '' }}
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: npm run version:set -- "$RELEASE_VERSION"
+        run: pnpm run version:set "$RELEASE_VERSION"
 
       - name: Fetch Chrome Web Store status
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.status_only == true }}
-        run: npm run release:store:status
+        run: pnpm run release:store:status
 
       - name: Publish existing Chrome Web Store draft
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_only == true }}
-        run: npm run release:store:publish
+        run: pnpm run release:store:publish
 
       - name: Cancel pending Chrome Web Store submission
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.cancel_submission == true }}
-        run: npm run release:store:cancel
+        run: pnpm run release:store:cancel
 
       - name: Build release zip
         if: ${{ steps.target.outputs.build == 'true' }}
         env:
           BROWSER_BIN: ${{ steps.chrome.outputs.bin }}
-        run: npm run release:zip
+        run: pnpm run release:zip
 
       - name: Upload release artifacts
         if: ${{ steps.target.outputs.build == 'true' }}
@@ -203,11 +207,11 @@ jobs:
 
       - name: Upload to Chrome Web Store
         if: ${{ steps.target.outputs.upload == 'true' }}
-        run: npm run release:store:upload
+        run: pnpm run release:store:upload
 
       - name: Publish in Chrome Web Store
         if: ${{ steps.target.outputs.submit == 'true' }}
-        run: npm run release:store:publish
+        run: pnpm run release:store:publish
 
   # Runs only after the store accepted the submission (or when the store is not
   # configured yet), so a failed upload leaves no tag behind and re-running the

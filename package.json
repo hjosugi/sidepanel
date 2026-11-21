@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "description": "Bookmarks in the Chrome side panel, with sites opened inside the panel.",
+  "packageManager": "pnpm@12.22.0",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -14,16 +15,16 @@
     "test": "node scripts/smoke-test.mjs",
     "test:unit": "node --test test/*.test.mjs",
     "compat": "node scripts/compat-check.mjs",
-    "release:check": "npm run lint && npm run test:unit && npm test",
+    "release:check": "pnpm run lint && pnpm run test:unit && pnpm run test",
     "release:package": "node scripts/package-extension.mjs",
-    "release:zip": "npm run release:check && npm run release:package",
+    "release:zip": "pnpm run release:check && pnpm run release:package",
     "release:store:assets": "node scripts/generate-store-assets.mjs",
     "release:store:status": "node scripts/chrome-webstore.mjs status",
     "release:store:upload": "node scripts/chrome-webstore.mjs upload",
     "release:store:publish": "node scripts/chrome-webstore.mjs publish",
     "release:store:submit": "node scripts/chrome-webstore.mjs submit",
     "release:store:cancel": "node scripts/chrome-webstore.mjs cancel",
-    "release:store": "npm run release:zip && npm run release:store:submit",
+    "release:store": "pnpm run release:zip && pnpm run release:store:submit",
     "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {

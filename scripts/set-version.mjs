@@ -1,12 +1,13 @@
-// package.json / package-lock.json / manifest.json のバージョンをまとめて書き換える。
-// usage: npm run version:set -- 1.2.1
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+// package.json / manifest.json のバージョンをまとめて書き換える。
+// pnpm-lock.yaml はルートのバージョンを持たないので書き換えない。
+// usage: pnpm run version:set 1.2.1
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const version = process.argv[2];
+const version = process.argv.slice(2).find((arg) => arg !== '--');
 
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error('Usage: npm run version:set -- <major.minor.patch>');
+  console.error('Usage: pnpm run version:set <major.minor.patch>');
   process.exit(1);
 }
 
@@ -21,12 +22,4 @@ for (const name of ['manifest.json', 'package.json']) {
   writeFileSync(target, next);
 }
 
-const lockPath = resolve(root, 'package-lock.json');
-if (existsSync(lockPath)) {
-  const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
-  lock.version = version;
-  if (lock.packages?.['']) lock.packages[''].version = version;
-  writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
-}
-
-console.log(`Version set to ${version} in manifest.json, package.json and package-lock.json`);
+console.log(`Version set to ${version} in manifest.json and package.json`);

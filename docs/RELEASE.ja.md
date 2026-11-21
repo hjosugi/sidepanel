@@ -18,8 +18,8 @@
 バージョンを上げたコミットが `main` に入ることがリリースです。手作業はこれだけです。
 
 ```sh
-npm run version:set -- X.Y.Z    # package.json、package-lock.json、manifest.json
-npm run release:zip             # 全チェックの後に .release/ を作る
+pnpm run version:set X.Y.Z      # package.json、manifest.json
+pnpm run release:zip            # 全チェックの後に .release/ を作る
 git switch -c release-X.Y.Z
 git commit -am "Release X.Y.Z"
 git push -u origin HEAD         # PR を作り、チェックを待ってマージ
@@ -36,13 +36,13 @@ git push -u origin HEAD         # PR を作り、チェックを待ってマー�
 
 守ること:
 
-- `main` がリリースするバージョンのタグを手で push しない。自動で付いたタグで 2 回目の実行は起きません。手で push した `vX.Y.Z` タグもそのタグをリリースしますが、`npm run version:set` が書いたバージョンと一致している必要があります。
-- ストアに出せる提出は一度に 1 つです。審査待ちのバージョンを置き換えるときは、ワークフローを `cancel_submission: true` で手動実行（または `npm run release:store:cancel`）してから、いつも通りバージョンを上げてマージします。
+- `main` がリリースするバージョンのタグを手で push しない。自動で付いたタグで 2 回目の実行は起きません。手で push した `vX.Y.Z` タグもそのタグをリリースしますが、`pnpm run version:set` が書いたバージョンと一致している必要があります。
+- ストアに出せる提出は一度に 1 つです。審査待ちのバージョンを置き換えるときは、ワークフローを `cancel_submission: true` で手動実行（または `pnpm run release:store:cancel`）してから、いつも通りバージョンを上げてマージします。
 - 通常のリリースでダッシュボードの「公開」ボタンを押さない。
 
 ## バージョン
 
-`package.json`、`package-lock.json`、`manifest.json` は常に同じバージョンにします。食い違うとワークフローと `npm run lint` が失敗します。`npm run version:set -- X.Y.Z` が 3 つをまとめて書き換えます。
+`package.json` と `manifest.json` は常に同じバージョンにします。食い違うとワークフローと `pnpm run lint` が失敗します。`pnpm run version:set X.Y.Z` が 2 つをまとめて書き換えます。
 
 - パッチ: 修正、サイト互換の調整、ドキュメント
 - マイナー: 利用者に見える機能や設定
@@ -51,22 +51,22 @@ git push -u origin HEAD         # PR を作り、チェックを待ってマー�
 ## チェック
 
 ```sh
-npm ci
-npm run release:check
+pnpm install
+pnpm run release:check
 ```
 
 `release:check` は Biome、マニフェスト・同梱ファイル・i18n の lint、ユニットテスト、ヘッドレスのサイドパネルのスモークテストを実行します。スモークテストには `--load-extension` が効く Chromium 系ブラウザ（Brave、Chromium、Chrome for Testing。`BROWSER_BIN` で指定）が必要です。ブランド版の Google Chrome は 137 以降このフラグを無視します。
 
 実際のサイトに依存するので `release:check` には入れていないもの:
 
-- `npm run compat`: 主要サイトに `Sec-Fetch-Dest: iframe` で問い合わせ、ステータスと埋め込みヘッダーを記録（Site compatibility ワークフローでも週 1 回実行）
+- `pnpm run compat`: 主要サイトに `Sec-Fetch-Dest: iframe` で問い合わせ、ステータスと埋め込みヘッダーを記録（Site compatibility ワークフローでも週 1 回実行）
 - `PROFILE_DIR=… node scripts/site-probe.mjs`: ログイン済みプロファイルのコピーで実際のサイトをサイドパネルに開く。`HEADED=1` でウィンドウを表示（Cloudflare はヘッドレスをボットと判定しやすい）、`SITES=ChatGPT,Claude` で対象を絞る（URL も書ける）。Cloudflare の確認でデスクトップ表示が案内されたら、切り替えてもう一度結果を出す
 
 フレーム、Cookie、ナビゲーションを変えたリリースの前には手で確認します。展開した拡張を読み込み、いくつかのサイト（メール、カレンダー、AI チャット）にログインしてパネルで開き、タブ列で切り替え、戻る・再読み込み・タブで開くを使います。
 
 ## zip
 
-`npm run release:zip` は `.release/`（Git では無視）に出力します。
+`pnpm run release:zip` は `.release/`（Git では無視）に出力します。
 
 - `sidepanel-bookmarks-vX.Y.Z.zip`、`.sha256`、`.release.json`
 - `sidepanel-bookmarks-vX.Y.Z-notes.md`、`-tester-install.md`
@@ -92,11 +92,11 @@ zip に入るのは `scripts/package-files.mjs` に並べたファイルだけ�
 認証情報を環境変数に入れれば、シェルからも同じことができます。
 
 ```sh
-npm run release:store:status
-npm run release:store:upload
-npm run release:store:publish
-npm run release:store:cancel
-npm run release:store            # release:zip の後にアップロードと提出
+pnpm run release:store:status
+pnpm run release:store:upload
+pnpm run release:store:publish
+pnpm run release:store:cancel
+pnpm run release:store           # release:zip の後にアップロードと提出
 node scripts/chrome-webstore.mjs submit --dry-run
 ```
 
@@ -121,10 +121,10 @@ GCP_SERVICE_ACCOUNT
 
 アップロードに失敗しても掲載は変わらず、最後に承認されたバージョンが公開されたままです。タグもまだ付いていません。
 
-- **`does not match`**: パッケージ、マニフェスト、手で push したタグのバージョンが食い違っています。`npm run version:set -- X.Y.Z` を実行してコミットします。間違ったタグは `git push origin ":refs/tags/<tag>"` で消します。
+- **`does not match`**: パッケージ、マニフェスト、手で push したタグのバージョンが食い違っています。`pnpm run version:set X.Y.Z` を実行してコミットします。間違ったタグは `git push origin ":refs/tags/<tag>"` で消します。
 - **アップロードや公開が一時的に失敗した**: 失敗したジョブを再実行すると、同じバージョンで再試行します。`github-release` だけが失敗したならそのジョブだけ再実行します。ストアへの提出は繰り返されません。
 - **`Missing required configuration`**: secret が足りません（`gh secret list | grep -E 'CHROME_WEBSTORE_|GCP_'`）。
-- **`publishers/<id>/items/<id>` への `403 PERMISSION_DENIED`**: トークンは有効ですが、その ID のアイテムを扱う権限がありません。`CHROME_WEBSTORE_EXTENSION_ID`、`CHROME_WEBSTORE_PUBLISHER_ID` がそのアイテムを持つパブリッシャーであること、`GCP_SERVICE_ACCOUNT` がダッシュボードでパブリッシャーに追加され招待が承認済みであること、`GCP_WORKLOAD_IDENTITY_PROVIDER` がこのリポジトリを指していること、Google Cloud プロジェクトで Chrome Web Store API が有効なことを確認します。確認し直すには `npm run release:store:status`。バージョンを上げて回避しようとしないこと。
+- **`publishers/<id>/items/<id>` への `403 PERMISSION_DENIED`**: トークンは有効ですが、その ID のアイテムを扱う権限がありません。`CHROME_WEBSTORE_EXTENSION_ID`、`CHROME_WEBSTORE_PUBLISHER_ID` がそのアイテムを持つパブリッシャーであること、`GCP_SERVICE_ACCOUNT` がダッシュボードでパブリッシャーに追加され招待が承認済みであること、`GCP_WORKLOAD_IDENTITY_PROVIDER` がこのリポジトリを指していること、Google Cloud プロジェクトで Chrome Web Store API が有効なことを確認します。確認し直すには `pnpm run release:store:status`。バージョンを上げて回避しようとしないこと。
 - **アップロードは成功し、警告で公開に失敗した**: ログを読み、ダッシュボードで警告を直し、パッチバージョンを上げてリリースし直します。
 - **審査で却下された**: 理由を issue に書き、コード・権限・掲載文・プライバシーの回答を直し、パッチバージョンを上げてリリースし直します。
 
@@ -172,7 +172,7 @@ GCP_SERVICE_ACCOUNT
   ```
 
 - ホームページ URL: `https://github.com/hjosugi/sidepanel`。サポート URL: `https://github.com/hjosugi/sidepanel/issues`
-- 画像: `icons/128.png`。`npm run release:store:assets` で、架空のデモサイトを使った 1280×800 のスクリーンショット 3 枚と 440×280 の小さなプロモーションタイルを `.release/store-assets/` に出力できます
+- 画像: `icons/128.png`。`pnpm run release:store:assets` で、架空のデモサイトを使った 1280×800 のスクリーンショット 3 枚と 440×280 の小さなプロモーションタイルを `.release/store-assets/` に出力できます
 
 ### プライバシーとデータの使用
 

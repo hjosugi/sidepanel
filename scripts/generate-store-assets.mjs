@@ -1,5 +1,5 @@
 // ストア掲載用の画像を .release/store-assets/ に生成する。架空のデモサイトだけを使う。
-// usage: npm run release:store:assets   (BROWSER_BIN で Chromium 系ブラウザを指定できる)
+// usage: pnpm run release:store:assets   (BROWSER_BIN で Chromium 系ブラウザを指定できる)
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import { join } from 'node:path';

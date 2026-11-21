@@ -1,7 +1,7 @@
 # Dependencies
 /node_modules/
 
-# Release/package outputs (npm run release:zip, release:store:assets)
+# Release/package outputs (pnpm run release:zip, release:store:assets)
 /.release/
 *.crx
 

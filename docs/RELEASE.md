@@ -18,8 +18,8 @@ The store updates only after review, so the published version can lag behind `ma
 A version-bump commit landing on `main` is the release. That is the only manual step.
 
 ```sh
-npm run version:set -- X.Y.Z    # package.json, package-lock.json, manifest.json
-npm run release:zip             # all checks, then .release/ artifacts
+pnpm run version:set X.Y.Z      # package.json, manifest.json
+pnpm run release:zip            # all checks, then .release/ artifacts
 git switch -c release-X.Y.Z
 git commit -am "Release X.Y.Z"
 git push -u origin HEAD         # open a PR, wait for checks, merge
@@ -36,13 +36,13 @@ Watch it with `gh run watch` and check the dashboard shows the item as pending r
 
 Rules:
 
-- Do not push the tag for a version `main` is releasing. The automatic tag does not start a second run. A manually pushed `vX.Y.Z` tag also releases that tag, but it must match the version written by `npm run version:set`.
-- The store accepts one submission at a time. To replace a version waiting for review, run the workflow manually with `cancel_submission: true` (or `npm run release:store:cancel`), then bump and merge as usual.
+- Do not push the tag for a version `main` is releasing. The automatic tag does not start a second run. A manually pushed `vX.Y.Z` tag also releases that tag, but it must match the version written by `pnpm run version:set`.
+- The store accepts one submission at a time. To replace a version waiting for review, run the workflow manually with `cancel_submission: true` (or `pnpm run release:store:cancel`), then bump and merge as usual.
 - Do not press Publish in the dashboard for normal releases.
 
 ## Versions
 
-`package.json`, `package-lock.json` and `manifest.json` always carry the same version; the workflow and `npm run lint` fail otherwise. `npm run version:set -- X.Y.Z` updates all three.
+`package.json` and `manifest.json` always carry the same version; the workflow and `pnpm run lint` fail otherwise. `pnpm run version:set X.Y.Z` updates both.
 
 - Patch: fixes, site compatibility tweaks, docs
 - Minor: user-visible features or settings
@@ -51,22 +51,22 @@ Rules:
 ## Checks
 
 ```sh
-npm ci
-npm run release:check
+pnpm install
+pnpm run release:check
 ```
 
 `release:check` runs Biome, the manifest / packaged-file / i18n lint, the unit tests and the headless side-panel smoke test. The smoke test needs a Chromium-based browser that still honors `--load-extension` (Brave, Chromium or Chrome for Testing; set `BROWSER_BIN`). Branded Google Chrome ignores the flag since version 137.
 
 Not in `release:check`, because they depend on real sites:
 
-- `npm run compat`: request status and embedding headers of popular sites with `Sec-Fetch-Dest: iframe` (also runs weekly in the Site compatibility workflow)
+- `pnpm run compat`: request status and embedding headers of popular sites with `Sec-Fetch-Dest: iframe` (also runs weekly in the Site compatibility workflow)
 - `PROFILE_DIR=… node scripts/site-probe.mjs`: open real sites in the side panel with a copy of a signed-in profile. `HEADED=1` shows the window (Cloudflare tends to flag headless browsers), `SITES=ChatGPT,Claude` limits the sites (URLs work too). When a Cloudflare check offers desktop layout, the probe switches and reports the result again
 
 Before a release that changes framing, cookies or navigation, check by hand: load the unpacked extension, sign in to a few sites (mail, calendar, an AI chat), open them in the panel, switch pages with the tab strip, and use back / reload / open in tab.
 
 ## Zip
 
-`npm run release:zip` writes to `.release/` (ignored by Git):
+`pnpm run release:zip` writes to `.release/` (ignored by Git):
 
 - `sidepanel-bookmarks-vX.Y.Z.zip`, `.sha256`, `.release.json`
 - `sidepanel-bookmarks-vX.Y.Z-notes.md`, `-tester-install.md`
@@ -92,11 +92,11 @@ Manual runs of `Chrome Web Store Release` (`workflow_dispatch`):
 The same from a shell, with the credentials in the environment:
 
 ```sh
-npm run release:store:status
-npm run release:store:upload
-npm run release:store:publish
-npm run release:store:cancel
-npm run release:store            # release:zip, then upload and submit
+pnpm run release:store:status
+pnpm run release:store:upload
+pnpm run release:store:publish
+pnpm run release:store:cancel
+pnpm run release:store           # release:zip, then upload and submit
 node scripts/chrome-webstore.mjs submit --dry-run
 ```
 
@@ -121,10 +121,10 @@ Alternative: an OAuth refresh token for the publisher account with the `https://
 
 A failed upload leaves the listing unchanged; the last approved version stays live and no tag has been created yet.
 
-- **`does not match`**: the package, manifest or a manually pushed tag disagree on the version. Run `npm run version:set -- X.Y.Z` and commit. Delete a wrong tag with `git push origin ":refs/tags/<tag>"`.
+- **`does not match`**: the package, manifest or a manually pushed tag disagree on the version. Run `pnpm run version:set X.Y.Z` and commit. Delete a wrong tag with `git push origin ":refs/tags/<tag>"`.
 - **Upload or publish failed transiently**: re-run the failed job; it retries the same version. If only `github-release` failed, re-run just that job; the store submission is not repeated.
 - **`Missing required configuration`**: a secret is missing (`gh secret list | grep -E 'CHROME_WEBSTORE_|GCP_'`).
-- **`403 PERMISSION_DENIED` on `publishers/<id>/items/<id>`**: the token works but cannot manage that item. Check `CHROME_WEBSTORE_EXTENSION_ID`, that `CHROME_WEBSTORE_PUBLISHER_ID` owns the item, that the `GCP_SERVICE_ACCOUNT` was added to the publisher in the dashboard and the invitation accepted, that `GCP_WORKLOAD_IDENTITY_PROVIDER` points at this repository, and that the Chrome Web Store API is enabled in the Google Cloud project. Re-check with `npm run release:store:status`. Do not bump the version to work around it.
+- **`403 PERMISSION_DENIED` on `publishers/<id>/items/<id>`**: the token works but cannot manage that item. Check `CHROME_WEBSTORE_EXTENSION_ID`, that `CHROME_WEBSTORE_PUBLISHER_ID` owns the item, that the `GCP_SERVICE_ACCOUNT` was added to the publisher in the dashboard and the invitation accepted, that `GCP_WORKLOAD_IDENTITY_PROVIDER` points at this repository, and that the Chrome Web Store API is enabled in the Google Cloud project. Re-check with `pnpm run release:store:status`. Do not bump the version to work around it.
 - **Upload succeeded, publish failed on warnings**: read the log, fix the warnings in the dashboard, bump the patch version and release again.
 - **Rejected in review**: record the reason in an issue, fix the code, permissions, listing or privacy answers, bump the patch version and release again.
 
@@ -172,7 +172,7 @@ One-time work, kept here for audits, re-creation and as the source for listing e
 
 - Description (Japanese): see [RELEASE.ja.md](RELEASE.ja.md#掲載文)
 - Homepage URL: `https://github.com/hjosugi/sidepanel`. Support URL: `https://github.com/hjosugi/sidepanel/issues`
-- Images: `icons/128.png`. `npm run release:store:assets` renders three 1280×800 screenshots and the 440×280 small promo tile into `.release/store-assets/` from fictional demo sites
+- Images: `icons/128.png`. `pnpm run release:store:assets` renders three 1280×800 screenshots and the 440×280 small promo tile into `.release/store-assets/` from fictional demo sites
 
 ### Privacy and Data Use
 
