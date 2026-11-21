@@ -79,23 +79,25 @@ The extension itself has no runtime dependencies, no build step, no analytics an
 
 ## Development
 
+The tooling uses [pnpm](https://pnpm.io/); its version is pinned in `packageManager` in `package.json`.
+
 ```sh
-npm ci
-npm run release:check   # lint + unit tests + headless side panel smoke test
-npm run release:zip     # release:check, then .release/ artifacts
+pnpm install
+pnpm run release:check  # lint + unit tests + headless side panel smoke test
+pnpm run release:zip    # release:check, then .release/ artifacts
 ```
 
 | Command | What it does |
 | --- | --- |
-| `npm run lint` | Biome, plus manifest / packaged-file / i18n checks |
-| `npm run test:unit` | Pure functions: rules, embedding check, cookie parsing, settings, address parsing and pin matching |
-| `npm test` | Loads the extension into headless Brave (or `BROWSER_BIN`), opens the real side panel and checks DNR headers, SPA tracking, mobile UA, fallbacks, nested-frame blocking, the cookie shim, the frame-check shim, the address bar, open tabs, pins, the startup page, settings and rule cleanup against a local server |
-| `npm run release:package` | Only build `.release/sidepanel-bookmarks-vX.Y.Z.zip` and its checksum, metadata, notes and tester guide |
-| `npm run release:store:assets` | Render store screenshots and the promo tile into `.release/store-assets/` |
-| `npm run version:set -- X.Y.Z` | Set the version in `package.json`, `package-lock.json` and `manifest.json` |
-| `npm run compat` | Check popular sites with `Sec-Fetch-Dest: iframe` |
+| `pnpm run lint` | Biome, plus manifest / packaged-file / i18n checks |
+| `pnpm run test:unit` | Pure functions: rules, embedding check, cookie parsing, settings, address parsing and pin matching |
+| `pnpm test` | Loads the extension into headless Brave (or `BROWSER_BIN`), opens the real side panel and checks DNR headers, SPA tracking, mobile UA, fallbacks, nested-frame blocking, the cookie shim, the frame-check shim, the address bar, open tabs, pins, the startup page, settings and rule cleanup against a local server |
+| `pnpm run release:package` | Only build `.release/sidepanel-bookmarks-vX.Y.Z.zip` and its checksum, metadata, notes and tester guide |
+| `pnpm run release:store:assets` | Render store screenshots and the promo tile into `.release/store-assets/` |
+| `pnpm run version:set X.Y.Z` | Set the version in `package.json` and `manifest.json` |
+| `pnpm run compat` | Check popular sites with `Sec-Fetch-Dest: iframe` |
 
-Branded Google Chrome ignores `--load-extension` since 137, so use Brave, Chromium or Chrome for Testing for `npm test`; CI uses Chrome for Testing and runs the smoke test on the unpacked release zip.
+Branded Google Chrome ignores `--load-extension` since 137, so use Brave, Chromium or Chrome for Testing for `pnpm test`; CI uses Chrome for Testing and runs the smoke test on the unpacked release zip.
 
 Releases are automatic: a version bump merged into `main` builds the zip, submits it to the Chrome Web Store when configured, then tags the commit and creates the GitHub Release. See [docs/RELEASE.md](docs/RELEASE.md).
 

@@ -78,23 +78,25 @@ Cloudflare のチャレンジ用フレーム（`challenges.cloudflare.com`）に
 
 ## 開発
 
+開発ツールは [pnpm](https://pnpm.io/) を使います。バージョンは `package.json` の `packageManager` で固定しています。
+
 ```sh
-npm ci
-npm run release:check   # lint、ユニットテスト、ヘッドレスのサイドパネルのスモークテスト
-npm run release:zip     # release:check の後に .release/ を作る
+pnpm install
+pnpm run release:check  # lint、ユニットテスト、ヘッドレスのサイドパネルのスモークテスト
+pnpm run release:zip    # release:check の後に .release/ を作る
 ```
 
 | コマンド | 内容 |
 | --- | --- |
-| `npm run lint` | Biome と、マニフェスト・同梱ファイル・i18n のチェック |
-| `npm run test:unit` | 純粋関数（ルール、埋め込み判定、Cookie の解析、設定、アドレスの解釈、ピンの照合）のテスト |
-| `npm test` | ヘッドレスの Brave（または `BROWSER_BIN`）に拡張を読み込み、実際のサイドパネルを開いて、ローカルサーバー相手に DNR のヘッダー、SPA の追従、モバイル UA、案内バー、ネストしたフレームの除去、Cookie の橋渡し、フレーム判定の調整、アドレス欄、開いているタブ、ピン留め、開いたときの表示、設定、ルールの後始末を確認 |
-| `npm run release:package` | `.release/sidepanel-bookmarks-vX.Y.Z.zip` とチェックサム・メタデータ・ノート・テスター向けガイドだけを作る |
-| `npm run release:store:assets` | ストア用のスクリーンショットとプロモーションタイルを `.release/store-assets/` に出力 |
-| `npm run version:set -- X.Y.Z` | `package.json`、`package-lock.json`、`manifest.json` のバージョンを設定 |
-| `npm run compat` | 主要サイトを `Sec-Fetch-Dest: iframe` で確認 |
+| `pnpm run lint` | Biome と、マニフェスト・同梱ファイル・i18n のチェック |
+| `pnpm run test:unit` | 純粋関数（ルール、埋め込み判定、Cookie の解析、設定、アドレスの解釈、ピンの照合）のテスト |
+| `pnpm test` | ヘッドレスの Brave（または `BROWSER_BIN`）に拡張を読み込み、実際のサイドパネルを開いて、ローカルサーバー相手に DNR のヘッダー、SPA の追従、モバイル UA、案内バー、ネストしたフレームの除去、Cookie の橋渡し、フレーム判定の調整、アドレス欄、開いているタブ、ピン留め、開いたときの表示、設定、ルールの後始末を確認 |
+| `pnpm run release:package` | `.release/sidepanel-bookmarks-vX.Y.Z.zip` とチェックサム・メタデータ・ノート・テスター向けガイドだけを作る |
+| `pnpm run release:store:assets` | ストア用のスクリーンショットとプロモーションタイルを `.release/store-assets/` に出力 |
+| `pnpm run version:set X.Y.Z` | `package.json` と `manifest.json` のバージョンを設定 |
+| `pnpm run compat` | 主要サイトを `Sec-Fetch-Dest: iframe` で確認 |
 
-ブランド版の Google Chrome は 137 以降 `--load-extension` を無視するので、`npm test` には Brave、Chromium、Chrome for Testing を使ってください。CI は Chrome for Testing で、展開したリリース用 zip に対してスモークテストを実行します。
+ブランド版の Google Chrome は 137 以降 `--load-extension` を無視するので、`pnpm test` には Brave、Chromium、Chrome for Testing を使ってください。CI は Chrome for Testing で、展開したリリース用 zip に対してスモークテストを実行します。
 
 リリースは自動です。バージョンを上げたコミットが `main` に入ると、zip を作り、設定済みなら Chrome ウェブストアに提出し、その後でタグと GitHub Release を作ります。詳しくは [docs/RELEASE.ja.md](docs/RELEASE.ja.md)。
 

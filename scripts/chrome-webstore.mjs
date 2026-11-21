@@ -107,7 +107,7 @@ function resolveZipPath() {
 
   if (!existsSync(artifactPath)) {
     throw new Error(
-      `Missing zip artifact: ${artifactPath}\nRun npm run release:zip first, or pass --zip <path>.`,
+      `Missing zip artifact: ${artifactPath}\nRun pnpm run release:zip first, or pass --zip <path>.`,
     );
   }
   const stat = statSync(artifactPath);
