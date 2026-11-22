@@ -17,6 +17,7 @@ export const PACKAGE_FILES = [
   'dock.js',
   'tabs.js',
   'urls.js',
+  'zoom.js',
   'cookies.js',
   'embedding.js',
   'net.js',

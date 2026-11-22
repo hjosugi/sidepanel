@@ -14,7 +14,8 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 - The tabs open in the current window are listed above the bookmarks, so a tab can be opened in the panel too. Ctrl / Cmd / Shift / middle click switches to that tab instead
 - Search bookmarks and open tabs (Enter opens the first match, or the typed address when nothing matches; "Show more" reveals the rest)
 - Open a bookmark in the panel; Ctrl / Cmd / Shift / middle click still opens a normal tab
-- Toolbar: ☰ list (✕ while the list is open), ‹ › back/forward, ⟳ reload, address bar, 📌 pin, ↗ open current page in a tab
+- Toolbar: ☰ list (✕ while the list is open), ‹ › back/forward, ⟳ reload, address bar, 📌 pin, 📱/🖥 layout, ⋯ menu (zoom, open the page in a tab, language, settings)
+- Zoom pages in the panel like browser zoom (50–200%): − / + in the ⋯ menu, or <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd> while the panel has focus. The zoom is remembered per site; the default zoom is in Settings
 - Address bar: shows the page's URL; click it (or press <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>D</kbd>) to edit the URL. Enter opens an address such as `example.com` in the panel; other text searches bookmarks and tabs
 - Tab strip under the toolbar, like a browser: each open page is a tab with its favicon, title and ✕ (middle click closes too), and + opens the list to pick another page
 - Pin sites like the Edge sidebar: pinned sites sit as icon-only tabs at the left of the strip, like pinned tabs in Chrome; a dot marks the ones that are loaded. Drag them to reorder
@@ -30,7 +31,7 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
   (see [#16](https://github.com/hjosugi/sidepanel/issues/16))
 - Nested iframes that would otherwise be blocked are removed instead of being exposed
 - Keyboard navigation (↑↓←→, Home/End), ARIA labels, live status messages
-- Settings page (the sliders button next to the search box, or the extension's Options): language, mobile layout, pages kept open, startup page, pinned sites, sites shown in desktop layout, sites shown as in a normal tab
+- Settings page (the sliders button next to the search box, or the extension's Options): language, mobile layout, pages kept open, default zoom, startup page, pinned sites, sites with their own zoom, sites shown in desktop layout, sites shown as in a normal tab
 
 ## Install
 
