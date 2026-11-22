@@ -1,17 +1,17 @@
-import { toUrl } from './urls.js';
+import { displayUrl, toUrl } from './urls.js';
 
 /**
- * アドレス欄。編集していないときはページのタイトルを、編集中は URL を表示する。
+ * アドレス欄。ふだんは https:// を省いた URL を、編集中は完全な URL を表示する
+ * （ページのタイトルはタブに出る）。
  * Enter で、URL として読める入力は onOpen に、それ以外は onSearch に渡す。
  */
 export function createAddressBar({ input, onOpen, onSearch }) {
   let url = '';
-  let label = '';
   // クリックで入ったときも全体を選択したままにする（mouseup で選択が解除されるため）
   let keepSelection = false;
 
   function show() {
-    if (document.activeElement !== input) input.value = label;
+    if (document.activeElement !== input) input.value = url ? displayUrl(url) : '';
     input.title = url;
   }
 
@@ -47,10 +47,9 @@ export function createAddressBar({ input, onOpen, onSearch }) {
   });
 
   return {
-    /** 表示中のページの URL と表示名。ページがなければ空文字 */
-    update(nextUrl, nextLabel) {
+    /** 表示中のページの URL。ページがなければ空文字 */
+    update(nextUrl) {
       url = nextUrl;
-      label = nextLabel;
       show();
     },
     focus() {

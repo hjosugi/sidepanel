@@ -18,6 +18,7 @@ test('toUrl uses http for local hosts', () => {
 test('toUrl keeps explicit http(s) URLs', () => {
   assert.equal(toUrl('http://example.com/a'), 'http://example.com/a');
   assert.equal(toUrl('HTTPS://Example.com'), 'https://example.com/');
+  assert.equal(toUrl('https://example.com/release notes'), 'https://example.com/release%20notes');
 });
 
 test('toUrl rejects search words and other schemes', () => {

@@ -92,6 +92,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     },
     onOpenPin: (item) => openUrl(item.url, item.name),
     onClosePage: closePage,
+    onNewTab: () => showList(true),
     async onMovePin(from, to) {
       const pins = [...settings.pins];
       const [moved] = pins.splice(from, 1);
@@ -103,7 +104,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
 
   function updateAddress() {
     const page = active();
-    address.update(page?.url ?? '', page ? pageText(page) : '');
+    address.update(page?.url ?? '');
     if (page) page.iframe.title = pageText(page) || t('app.name');
   }
 

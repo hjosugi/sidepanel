@@ -82,8 +82,9 @@ async function clickDock(prefix) {
   return clicked;
 }
 
+// 表示中のページのタイトル（iframe の title に入る）
 async function title() {
-  return panel.evaluate('document.getElementById("address").value');
+  return panel.evaluate(`document.querySelector('#frames iframe:not([hidden])')?.title ?? ''`);
 }
 
 async function settingsValue(key) {
@@ -414,7 +415,7 @@ try {
   check(
     'options: lowering the page limit closes older pages',
     (await panel.evaluate("document.querySelectorAll('#frames iframe').length")) === 1 &&
-      (await panel.evaluate('document.getElementById("dock").hidden')),
+      (await panel.evaluate("document.querySelectorAll('#dock .dock-item').length")) === 1,
   );
   await options.evaluate(`(() => {
     const pages = document.getElementById('pages');
@@ -718,6 +719,35 @@ try {
   await closeTarget(brave.port, startTab.id);
   check('startup opens the chosen page', startSrc === `${server.base}/start`, String(startSrc));
   await patchSettings({ startup: 'last', startUrl: '' });
+
+  // tab strip: the close button closes a page, + opens the list
+  await openBookmark(`${base2}/page-b`);
+  await sleep(500);
+  const framesBefore = await panel.evaluate("document.querySelectorAll('#frames iframe').length");
+  const closed = await panel.evaluate(`(() => {
+    const tab = [...document.querySelectorAll('#dock .dock-item.tab')]
+      .find((el) => el.dataset.url.startsWith(${JSON.stringify(base2)}));
+    tab?.querySelector('.dock-close').click();
+    return Boolean(tab);
+  })()`);
+  await sleep(300);
+  check(
+    'tab close button closes the page',
+    closed &&
+      (await panel.evaluate("document.querySelectorAll('#frames iframe').length")) ===
+        framesBefore - 1 &&
+      !(await panel.evaluate('document.getElementById("address").title')).startsWith(base2),
+    `before=${framesBefore}`,
+  );
+  await ensureList(false);
+  await panel.evaluate("document.querySelector('#dock .dock-new').click()");
+  await sleep(300);
+  check(
+    'new tab button opens the list',
+    await panel.evaluate(
+      "document.body.classList.contains('list') && document.activeElement === document.getElementById('q')",
+    ),
+  );
 
   // language switch
   await panel.evaluate('document.getElementById("lang").click()');
