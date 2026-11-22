@@ -165,6 +165,9 @@ jobs:
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          # Only the access token is used. Without this the action writes
+          # gha-creds-*.json into the workspace, where the release lint sees it.
+          create_credentials_file: false
 
       - name: Use short-lived Chrome Web Store access token
         if: ${{ steps.google-auth.outcome == 'success' }}
