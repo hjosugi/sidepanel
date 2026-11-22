@@ -41,12 +41,15 @@ async function addBookmark(url, title) {
   await sleep(250);
 }
 
-async function openBookmark(url) {
-  const listOpen = await panel.evaluate('document.body.classList.contains("list")');
-  if (!listOpen) {
+async function ensureList(open) {
+  if ((await panel.evaluate('document.body.classList.contains("list")')) !== open) {
     await panel.evaluate('document.getElementById("menu").click()');
     await sleep(450);
   }
+}
+
+async function openBookmark(url) {
+  await ensureList(true);
   const clicked = await panel.evaluate(`(() => {
     const a = [...document.querySelectorAll('.bm')].find((el) => el.href === ${JSON.stringify(url)});
     if (!a) return false;
@@ -55,6 +58,28 @@ async function openBookmark(url) {
   })()`);
   if (!clicked) throw new Error(`bookmark not found: ${url}`);
   await sleep(500);
+}
+
+/** 一覧の検索欄に入力する（結果は 150ms 後に描画される） */
+async function search(text) {
+  await panel.evaluate(`(() => {
+    const q = document.getElementById('q');
+    q.value = ${JSON.stringify(text)};
+    q.dispatchEvent(new Event('input'));
+    q.focus();
+  })()`);
+}
+
+/** URL が prefix で始まるアイコンのバーの項目を押す */
+async function clickDock(prefix) {
+  const clicked = await panel.evaluate(`(() => {
+    const item = [...document.querySelectorAll('#dock .dock-item')]
+      .find((el) => el.dataset.url.startsWith(${JSON.stringify(prefix)}));
+    item?.click();
+    return Boolean(item);
+  })()`);
+  await sleep(300);
+  return clicked;
 }
 
 async function title() {
@@ -74,13 +99,6 @@ async function patchSettings(patch) {
     await chrome.runtime.sendMessage({ type: 'settings-changed' });
   })()`);
   await sleep(200);
-}
-
-async function ensureList(open) {
-  if ((await panel.evaluate('document.body.classList.contains("list")')) !== open) {
-    await panel.evaluate('document.getElementById("menu").click()');
-    await sleep(400);
-  }
 }
 
 try {
@@ -321,13 +339,7 @@ try {
   );
   const tabCount = await panel.evaluate("document.querySelectorAll('#dock .dock-item').length");
   check('#11 dock lists the open pages', tabCount >= 2, `pages=${tabCount}`);
-  const switched = await panel.evaluate(`(() => {
-    const button = [...document.querySelectorAll('#dock .dock-item')].find((item) => item.dataset.url.startsWith(${JSON.stringify(base2)}));
-    if (!button) return false;
-    button.click();
-    return true;
-  })()`);
-  await sleep(300);
+  const switched = await clickDock(base2);
   check(
     '#11 dock switches pages without reloading',
     switched && (await logs()).logs.filter((entry) => entry.path === '/page-b').length === 1,
@@ -340,9 +352,7 @@ try {
   await addBookmark(`${base2}/spa`, 'SPA 2');
   await openBookmark(`${base2}/spa`);
   await waitFor(async () => (await title()) === 'SPA Next', { timeout: 5000 }).catch(() => {});
-  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
-    .find((item) => item.dataset.url.startsWith(${JSON.stringify(server.base)})).click()`);
-  await sleep(200);
+  await clickDock(server.base);
   await panel.evaluate('document.getElementById("back").click()');
   await waitFor(
     async () =>
@@ -357,9 +367,7 @@ try {
   );
 
   // pins: the pin button adds the page to the dock, and the pin reopens it
-  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
-    .find((item) => item.dataset.url.startsWith(${JSON.stringify(base2)})).click()`);
-  await sleep(300);
+  await clickDock(base2);
   await panel.evaluate('document.getElementById("pin").click()');
   await sleep(300);
   const pins = await settingsValue('pins');
@@ -378,9 +386,7 @@ try {
       return Boolean(item?.querySelector('img')?.src.includes('/_favicon/')) && item.hasAttribute('data-alive');
     })()`),
   );
-  await panel.evaluate(`[...document.querySelectorAll('#dock .dock-item')]
-    .find((item) => item.dataset.url.startsWith(${JSON.stringify(server.base)})).click()`);
-  await sleep(300);
+  await clickDock(server.base);
   await panel.evaluate('document.querySelector(\'#dock .dock-item[data-pin="0"]\').click()');
   await sleep(300);
   check(
@@ -472,11 +478,7 @@ try {
     return folder.id;
   })()`);
   await sleep(800);
-  const listVisible = await panel.evaluate('document.body.classList.contains("list")');
-  if (!listVisible) {
-    await panel.evaluate('document.getElementById("menu").click()');
-    await sleep(500);
-  }
+  await ensureList(true);
   await panel.evaluate(`(() => {
     const d = document.querySelector('details[data-id="' + ${JSON.stringify(largeFolderId)} + '"]');
     if (d && !d.open) d.querySelector('summary').click();
@@ -513,11 +515,7 @@ try {
       `getComputedStyle(document.querySelector('details[data-id="${largeFolderId}"] .bm')).contentVisibility`,
     )) === 'auto',
   );
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = 'large-item';
-    q.dispatchEvent(new Event('input'));
-  })()`);
+  await search('large-item');
   await sleep(500);
   const moreCount = await panel.evaluate(`document.getElementById('more')?.textContent ?? ''`);
   check(
@@ -533,11 +531,7 @@ try {
     '#10 Show more reveals the next page of results',
     (await panel.evaluate("document.querySelectorAll('#tree .bm').length")) === 400,
   );
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = '';
-    q.dispatchEvent(new Event('input'));
-  })()`);
+  await search('');
   await sleep(700);
   await panel.evaluate(`Promise.all([
     chrome.bookmarks.removeTree(${JSON.stringify(largeFolderId)}),
@@ -546,10 +540,7 @@ try {
   await sleep(500);
 
   // #14 keyboard navigation
-  if (!(await panel.evaluate('document.body.classList.contains("list")'))) {
-    await panel.evaluate('document.getElementById("menu").click()');
-    await sleep(400);
-  }
+  await ensureList(true);
   const keyboard = await panel.evaluate(`(() => {
     const tree = document.getElementById('tree');
     const rows = [...tree.querySelectorAll('summary, .bm')].filter((el) => el.getClientRects().length);
@@ -573,12 +564,7 @@ try {
   check('#14 the active row has a roving tabindex', keyboard?.tabIndex === 0);
 
   // #15 Esc clears the search, then closes the list
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = 'large-item';
-    q.dispatchEvent(new Event('input'));
-    q.focus();
-  })()`);
+  await search('large-item');
   await sleep(300);
   await panel.evaluate(
     "dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
@@ -663,11 +649,7 @@ try {
         [...document.querySelectorAll('#tree .bm')].some((a) => a.textContent === 'SecFetch')`,
     ),
   );
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = '';
-    q.dispatchEvent(new Event('input'));
-  })()`);
+  await search('');
   await sleep(300);
 
   // open browser tabs are listed and open in the panel
@@ -686,11 +668,7 @@ try {
       `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)} && a.textContent === '/tab-source')`,
     ),
   );
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = 'tab-source';
-    q.dispatchEvent(new Event('input'));
-  })()`);
+  await search('tab-source');
   await sleep(500);
   check(
     'search finds open browser tabs',
@@ -704,11 +682,7 @@ try {
   await waitFor(async () => (await title()) === '/tab-source', { timeout: 5000 }).catch(() => {});
   check('clicking a tab opens it in the panel', (await title()) === '/tab-source');
   await closeTarget(brave.port, browserTab.id);
-  await panel.evaluate(`(() => {
-    const q = document.getElementById('q');
-    q.value = '';
-    q.dispatchEvent(new Event('input'));
-  })()`);
+  await search('');
 
   // sites in unframedHosts see themselves as the top frame; other sites still see the frame
   await patchSettings({ unframedHosts: ['127.0.0.1'] });

@@ -1,6 +1,6 @@
 import { getLang, setLang, t } from './i18n.js';
 import { getSettings, MAX_PAGES, normalizeSettings, readLocal, setSettings } from './store.js';
-import { displayUrl, favicon, hostOf, toUrl } from './urls.js';
+import { displayUrl, hostOf, iconSources, toUrl } from './urls.js';
 
 const lang = document.getElementById('lang');
 const mobile = document.getElementById('mobile');
@@ -72,11 +72,7 @@ function renderPins() {
       const name = pin.name || displayUrl(pin.url);
       const item = document.createElement('li');
       const img = document.createElement('img');
-      img.alt = '';
-      img.width = 16;
-      img.height = 16;
-      img.src = favicon(pin.url, 16);
-      img.srcset = `${favicon(pin.url, 16)} 1x, ${favicon(pin.url, 32)} 2x`;
+      Object.assign(img, { alt: '', width: 16, height: 16 }, iconSources(pin.url));
       const text = document.createElement('span');
       text.className = 'name';
       text.textContent = name;
