@@ -19,6 +19,8 @@
   const CACHE_KEY = 'spb:unframe';
   const CACHE_FILES = 100;
   const page = location.href.replace(/#.*$/, '');
+  // Cloudflare の確認のスクリプトはもう一度リクエストしない（確認ごとに URL が変わり、比較もない）
+  const SKIP = /^https:\/\/challenges\.cloudflare\.com\/|^https?:\/\/[^/]+\/cdn-cgi\//;
   // self === top / self !== top と、その逆順。self の位置を返す
   const SELF_FIRST = /(?<![\w$])self\s*[!=]==?\s*(?:window\.|globalThis\.)?top(?![\w$])/g;
   const TOP_FIRST =
@@ -36,7 +38,10 @@
 
   function persist() {
     try {
-      const recent = [...checks].slice(-CACHE_FILES).map(([file, set]) => [file, [...set]]);
+      const recent = [...checks]
+        .filter(([file]) => !new URL(file).search)
+        .slice(-CACHE_FILES)
+        .map(([file, set]) => [file, [...set]]);
       localStorage.setItem(CACHE_KEY, JSON.stringify(recent));
     } catch {
       // 保存できなければ毎回取得する
@@ -70,7 +75,8 @@
       // 取得できないスクリプトでは何もしない
     }
     checks.set(file, positions);
-    persist();
+    // クエリ付きの URL は読み込みごとに変わりやすいので、キャッシュに残さない
+    if (!new URL(file).search) persist();
     return positions;
   }
 
@@ -100,7 +106,8 @@
   function isFrameCheck(getter) {
     const site = callSite(getter);
     const file = site?.getFileName?.();
-    if (!file || !/^https?:/.test(file) || file.replace(/#.*$/, '') === page) return false;
+    if (!file || !/^https?:/.test(file) || SKIP.test(file)) return false;
+    if (file.replace(/#.*$/, '') === page) return false;
     return positionsIn(file).has(`${site.getLineNumber()}:${site.getColumnNumber()}`);
   }
 
