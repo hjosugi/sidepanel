@@ -44,7 +44,9 @@ const brave = await launchBrave(new URL('..', import.meta.url).pathname, {
 let panel;
 
 async function snapshot() {
-  const title = await panel.evaluate('document.getElementById("address").value');
+  const title = await panel.evaluate(
+    `document.querySelector('#frames iframe:not([hidden])')?.title ?? ''`,
+  );
   const notice = await panel.evaluate(
     'document.getElementById("notice").hidden ? "" : document.getElementById("notice-text").textContent',
   );

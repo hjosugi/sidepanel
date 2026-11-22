@@ -17,7 +17,7 @@ The extension processes the following data locally in the browser:
   search them in the side panel; they are read when the list is shown and are not
   stored
 - The URL and title of pages opened in the side panel, to show them in the panel
-  header and icon bar; the last URL is remembered so the panel can reopen it
+  header and tab strip; the last URL is remembered so the panel can reopen it
 - Cookies of the site open in the side panel (see below)
 - Response headers of side-panel frames, to detect errors and to remove nested
   frames that a site does not allow to be embedded

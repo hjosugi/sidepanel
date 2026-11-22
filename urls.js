@@ -42,8 +42,9 @@ const DOMAIN = /^([\p{L}\p{N}-]+\.)+\p{L}[\p{L}\p{N}-]*$/u;
  */
 export function toUrl(input) {
   const text = String(input ?? '').trim();
-  if (!text || /\s/.test(text)) return null;
+  // スキームを書いたときは、空白を含んでもブラウザと同じく URL として扱う
   if (/^https?:\/\//i.test(text)) return parseHttp(text);
+  if (!text || /\s/.test(text)) return null;
   // example.com:8080 はスキームではなくポート。それ以外のスキーム（chrome: など）は扱わない
   if (SCHEME.test(text) && !HOST_PORT.test(text)) return null;
   const host = text.split(/[/?#]/)[0].replace(/:\d+$/, '');

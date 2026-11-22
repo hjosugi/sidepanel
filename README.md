@@ -15,12 +15,13 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 - Search bookmarks and open tabs (Enter opens the first match, or the typed address when nothing matches; "Show more" reveals the rest)
 - Open a bookmark in the panel; Ctrl / Cmd / Shift / middle click still opens a normal tab
 - Toolbar: ☰ list (✕ while the list is open), ‹ › back/forward, ⟳ reload, address bar, 📌 pin, ↗ open current page in a tab
-- Address bar: shows the page title; click it (or press <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>D</kbd>) to edit the URL. Enter opens an address such as `example.com` in the panel; other text searches bookmarks and tabs
-- Pin sites like the Edge sidebar: pinned sites sit as favicons under the toolbar, open pages show a dot and the visible one is underlined. Drag icons to reorder; middle click closes an open page
+- Address bar: shows the page's URL; click it (or press <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>D</kbd>) to edit the URL. Enter opens an address such as `example.com` in the panel; other text searches bookmarks and tabs
+- Tab strip under the toolbar, like a browser: each open page is a tab with its favicon, title and ✕ (middle click closes too), and + opens the list to pick another page
+- Pin sites like the Edge sidebar: pinned sites sit as icon-only tabs at the left of the strip, like pinned tabs in Chrome; a dot marks the ones that are loaded. Drag them to reorder
 - Choose what the panel shows when it opens: the last page, bookmarks and tabs, or a specific page (like a home page)
 - Mobile layout by default: a mobile UA, Client Hints, and `navigator.userAgent` are used to fit the narrow panel
   - Toggle 🖥/📱 per site; the choice is remembered
-- Keep several pages alive (3 by default, 1–5 in Settings). Open pages appear as icons next to the pins, so Gmail ⇄ Claude ⇄ Keep switches without reloading
+- Keep several pages alive (3 by default, 1–5 in Settings). Switching tabs keeps each page as it was, so Gmail ⇄ Claude ⇄ Keep switches without reloading
 - Claude's chat list works in the panel: Claude hides it inside frames, so for the sites in Settings (Claude by default) the panel hides that the page is in a frame
 - Page titles and SPA (`pushState`) URLs are tracked from a content script
 - Fallback bar for HTTP errors, sign-in pages and Cloudflare checks, with "Open in tab"

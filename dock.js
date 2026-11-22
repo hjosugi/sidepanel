@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import { iconSources, matchPin } from './urls.js';
 
 const PIN_TYPE = 'application/x-sidepanel-pin';
@@ -19,28 +20,60 @@ export function assignPages(pins, pages) {
 }
 
 /**
- * Edge のサイドバーのように、ピン留めしたサイトと開いているページをアイコンで並べる。
- * ピンに当たるページはそのピンのアイコンで表し、残りのページは区切りの後ろに並べる。
+ * ブラウザのタブ列と同じ形で、開いているページとピン留めしたサイトを並べる。
+ * ピンは Chrome の固定タブのように左端にアイコンだけで並び、そのサイトのページを表す。
+ * ほかのページはファビコン・タイトル・閉じるボタンのあるタブになる。
  */
-export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMovePin }) {
+export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMovePin, onNewTab }) {
   let pins = [];
   let pages = [];
 
-  function itemButton(url, label, page, current) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'dock-item';
-    button.dataset.url = url;
-    button.title = label;
-    button.setAttribute('aria-label', label);
+  function item(kind, url, label, page, current) {
+    const tab = document.createElement('div');
+    tab.className = `dock-item ${kind}`;
+    tab.dataset.url = url;
+    tab.title = label;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'dock-open';
+    open.setAttribute('aria-label', label);
     const img = document.createElement('img');
     Object.assign(img, { alt: '' }, iconSources(url));
-    button.append(img);
-    if (page) {
-      button.dataset.pageId = String(page.id);
-      button.dataset.alive = '';
-      if (page === current) button.setAttribute('aria-current', 'page');
+    open.append(img);
+    tab.append(open);
+    if (kind === 'tab') {
+      const text = document.createElement('span');
+      text.className = 'dock-title';
+      text.textContent = label;
+      open.append(text);
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'dock-close';
+      close.title = t('dock.close', { name: label });
+      close.setAttribute('aria-label', close.title);
+      close.innerHTML =
+        '<svg aria-hidden="true" viewBox="0 0 16 16"><path d="m5 5 6 6m0-6-6 6"/></svg>';
+      tab.append(close);
     }
+    if (page) {
+      tab.dataset.pageId = String(page.id);
+      tab.dataset.alive = '';
+      if (page === current) {
+        tab.classList.add('current');
+        open.setAttribute('aria-current', 'page');
+      }
+    }
+    return tab;
+  }
+
+  function newTabButton() {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'dock-new';
+    button.title = t('dock.new');
+    button.setAttribute('aria-label', button.title);
+    button.innerHTML =
+      '<svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg>';
     return button;
   }
 
@@ -54,7 +87,7 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
   function render(state) {
     pins = state.pins;
     pages = state.pages;
-    element.hidden = !pins.length && pages.length < 2;
+    element.hidden = !pins.length && !pages.length;
     if (element.hidden) {
       element.replaceChildren();
       return;
@@ -63,20 +96,15 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
     const items = pins.map((pin, index) => {
       const page = pinned.get(pin.url);
       const label = page ? state.label(page) : pin.name || pin.url;
-      const button = itemButton(pin.url, label, page, state.current);
-      button.dataset.pin = String(index);
-      button.draggable = true;
-      return button;
+      const tab = item('pin', pin.url, label, page, state.current);
+      tab.dataset.pin = String(index);
+      tab.draggable = true;
+      return tab;
     });
-    if (pins.length && loose.length) {
-      const separator = document.createElement('span');
-      separator.className = 'dock-separator';
-      items.push(separator);
-    }
     for (const page of loose) {
-      items.push(itemButton(page.url, state.label(page), page, state.current));
+      items.push(item('tab', page.url, state.label(page), page, state.current));
     }
-    element.replaceChildren(...items);
+    element.replaceChildren(...items, newTabButton());
     element
       .querySelector('[aria-current]')
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -88,18 +116,26 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
   }
 
   element.addEventListener('click', (event) => {
-    const button = event.target.closest('.dock-item');
-    if (!button) return;
-    const page = pageOf(button);
+    if (event.target.closest('.dock-new')) {
+      onNewTab();
+      return;
+    }
+    const tab = event.target.closest('.dock-item');
+    if (!tab) return;
+    const page = pageOf(tab);
+    if (page && event.target.closest('.dock-close')) {
+      onClosePage(page);
+      return;
+    }
     if (page) {
       onSelectPage(page);
       return;
     }
-    const pin = pins[Number(button.dataset.pin)];
+    const pin = pins[Number(tab.dataset.pin)];
     if (pin) onOpenPin(pin);
   });
 
-  // 中クリックで開いているページを閉じる（mousedown を止めないと自動スクロールが始まる）
+  // ブラウザのタブと同じく、中クリックでも閉じる（mousedown を止めないと自動スクロールが始まる）
   element.addEventListener('mousedown', (event) => {
     if (event.button === 1 && pageOf(event.target)) event.preventDefault();
   });
