@@ -6,6 +6,8 @@
 *.crx
 
 # Local secrets and machine-specific files
+# (google-github-actions/auth writes gha-creds-*.json into the workspace during releases)
+gha-creds-*.json
 .env
 .env.*
 *.pem
