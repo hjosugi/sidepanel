@@ -21,7 +21,7 @@ export const STARTUPS = ['last', 'list', 'url'];
 
 const HOST = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/;
 
-export function cleanHosts(value) {
+function cleanHosts(value) {
   const hosts = Array.isArray(value) ? value : [];
   return [
     ...new Set(

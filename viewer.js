@@ -1,8 +1,10 @@
+import { createAddressBar } from './address.js';
 import { createCookieBridge } from './cookies.js';
+import { createDock } from './dock.js';
 import { getLang, LANGS, setLang, t } from './i18n.js';
 import { watchPanelFrames } from './net.js';
 import { normalizeSettings, setSettings, writeLocal } from './store.js';
-import { displayUrl, favicon, hostOf, matchPin, toUrl } from './urls.js';
+import { displayUrl, hostOf, matchPin } from './urls.js';
 
 const LOGIN_HOSTS = [
   'accounts.google.com',
@@ -20,20 +22,9 @@ function isLoginHost(host) {
   return LOGIN_HOSTS.some((login) => host === login || host.endsWith(`.${login}`));
 }
 
-function setIcon(img, url) {
-  const small = favicon(url, 16);
-  img.alt = '';
-  img.width = 16;
-  img.height = 16;
-  img.src = small;
-  img.srcset = `${small} 1x, ${favicon(url, 32)} 2x`;
-}
-
 export function createViewer({ settings: initialSettings, onListShown, onLanguageChange }) {
   const frames = document.getElementById('frames');
-  const dock = document.getElementById('dock');
   const q = document.getElementById('q');
-  const address = document.getElementById('address');
   const pin = document.getElementById('pin');
   const notice = document.getElementById('notice');
   const noticeText = document.getElementById('notice-text');
@@ -82,12 +73,47 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     return page.title || page.name || displayUrl(page.url) || t('page.untitled');
   }
 
-  // アドレス欄は編集していないときはタイトル、編集中は URL を表示する
+  const address = createAddressBar({
+    input: document.getElementById('address'),
+    onOpen: (url) => openUrl(url, '', { force: true }),
+    // URL でなければブックマークとタブを検索する
+    onSearch(text) {
+      q.value = text;
+      q.dispatchEvent(new Event('input'));
+      showList(true);
+    },
+  });
+
+  const dock = createDock({
+    element: document.getElementById('dock'),
+    onSelectPage(page) {
+      setActive(page);
+      showList(false);
+    },
+    onOpenPin: (item) => openUrl(item.url, item.name),
+    onClosePage: closePage,
+    async onMovePin(from, to) {
+      const pins = [...settings.pins];
+      const [moved] = pins.splice(from, 1);
+      pins.splice(to, 0, moved);
+      settings = await setSettings({ pins });
+      updateDock();
+    },
+  });
+
   function updateAddress() {
     const page = active();
-    if (document.activeElement !== address) address.value = page ? pageText(page) : '';
-    address.title = page?.url ?? '';
+    address.update(page?.url ?? '', page ? pageText(page) : '');
     if (page) page.iframe.title = pageText(page) || t('app.name');
+  }
+
+  function updateDock() {
+    dock.render({
+      pins: settings.pins,
+      pages: [...pages.values()],
+      current: isListOpen() ? null : active(),
+      label: pageText,
+    });
   }
 
   function updateTitle(page) {
@@ -132,58 +158,6 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     langButton.textContent = getLang().toUpperCase();
     langButton.title = t('lang.label');
     langButton.setAttribute('aria-label', t('lang.label'));
-  }
-
-  function dockButton(url, label, page) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'dock-item';
-    button.dataset.url = url;
-    button.title = label;
-    button.setAttribute('aria-label', label);
-    const img = document.createElement('img');
-    setIcon(img, url);
-    button.append(img);
-    if (page) {
-      button.dataset.pageId = String(page.id);
-      button.dataset.alive = '';
-      if (page === active() && !isListOpen()) button.setAttribute('aria-current', 'page');
-    }
-    return button;
-  }
-
-  // Edge のサイドバーのように、ピン留めしたサイトと開いているページをアイコンで並べる。
-  // ピンに当たるページはそのピンのアイコンで表し、残りのページは区切りの後ろに並べる
-  function updateDock() {
-    const pins = settings.pins;
-    const pinned = new Map();
-    const loose = [];
-    for (const page of pages.values()) {
-      const match = page.url ? matchPin(pins, page.url) : null;
-      if (match && !pinned.has(match.url)) pinned.set(match.url, page);
-      else loose.push(page);
-    }
-    dock.hidden = !pins.length && pages.size < 2;
-    if (dock.hidden) {
-      dock.replaceChildren();
-      return;
-    }
-    const items = pins.map((item, index) => {
-      const page = pinned.get(item.url);
-      const label = page ? pageText(page) : item.name || displayUrl(item.url);
-      const button = dockButton(item.url, label, page);
-      button.dataset.pin = String(index);
-      button.draggable = true;
-      return button;
-    });
-    if (pins.length && loose.length) {
-      const separator = document.createElement('span');
-      separator.className = 'dock-separator';
-      items.push(separator);
-    }
-    for (const page of loose) items.push(dockButton(page.url, pageText(page), page));
-    dock.replaceChildren(...items);
-    dock.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   function updateNotice() {
@@ -495,60 +469,6 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
 
   menu.addEventListener('click', toggleList);
 
-  dock.addEventListener('click', (event) => {
-    const button = event.target.closest('.dock-item');
-    if (!button) return;
-    const page = pages.get(Number(button.dataset.pageId));
-    if (page) {
-      setActive(page);
-      showList(false);
-      return;
-    }
-    const item = settings.pins[Number(button.dataset.pin)];
-    if (item) openUrl(item.url, item.name);
-  });
-  // 中クリックで開いているページを閉じる
-  dock.addEventListener('mousedown', (event) => {
-    if (event.button === 1 && event.target.closest('.dock-item[data-alive]')) {
-      event.preventDefault();
-    }
-  });
-  dock.addEventListener('auxclick', (event) => {
-    const page = pages.get(Number(event.target.closest('.dock-item')?.dataset.pageId));
-    if (event.button !== 1 || !page) return;
-    event.preventDefault();
-    closePage(page);
-  });
-
-  // ピンはドラッグで並べ替える
-  const PIN_TYPE = 'application/x-sidepanel-pin';
-  dock.addEventListener('dragstart', (event) => {
-    const button = event.target.closest('.dock-item[data-pin]');
-    if (!button) return;
-    event.dataTransfer.setData(PIN_TYPE, button.dataset.pin);
-    event.dataTransfer.effectAllowed = 'move';
-  });
-  dock.addEventListener('dragover', (event) => {
-    if (!event.dataTransfer.types.includes(PIN_TYPE)) return;
-    if (!event.target.closest('.dock-item[data-pin]')) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-  });
-  dock.addEventListener('drop', async (event) => {
-    const target = event.target.closest('.dock-item[data-pin]');
-    const raw = event.dataTransfer.getData(PIN_TYPE);
-    const from = Number(raw);
-    if (!target || raw === '' || !Number.isInteger(from)) return;
-    event.preventDefault();
-    const to = Number(target.dataset.pin);
-    if (from === to) return;
-    const pins = [...settings.pins];
-    const [moved] = pins.splice(from, 1);
-    pins.splice(to, 0, moved);
-    settings = await setSettings({ pins });
-    updateDock();
-  });
-
   pin.addEventListener('click', async () => {
     const page = active();
     if (!page) return;
@@ -562,44 +482,6 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     announce(t(current ? 'pin.removed' : 'pin.added'));
   });
 
-  // クリックで入ったときも全体を選択したままにする（mouseup で選択が解除されるため）
-  let keepSelection = false;
-  address.addEventListener('focus', () => {
-    const page = active();
-    if (page) address.value = page.url;
-    address.select();
-    keepSelection = true;
-  });
-  address.addEventListener('mouseup', (event) => {
-    if (keepSelection) event.preventDefault();
-    keepSelection = false;
-  });
-  address.addEventListener('blur', () => {
-    keepSelection = false;
-    updateAddress();
-  });
-  address.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      address.blur();
-      return;
-    }
-    if (event.key !== 'Enter' || event.isComposing) return;
-    event.preventDefault();
-    const text = address.value.trim();
-    if (!text) return;
-    const url = toUrl(text);
-    address.blur();
-    if (url) {
-      openUrl(url, '', { force: true });
-      return;
-    }
-    // URL でなければブックマークとタブを検索する
-    q.value = text;
-    q.dispatchEvent(new Event('input'));
-    showList(true);
-  });
   document
     .getElementById('settings')
     .addEventListener('click', () => chrome.runtime.openOptionsPage().catch(() => {}));

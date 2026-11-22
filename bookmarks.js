@@ -1,7 +1,7 @@
 import { t } from './i18n.js';
 import { readLocal, writeLocal } from './store.js';
 import { createTabs } from './tabs.js';
-import { favicon, toUrl } from './urls.js';
+import { iconSources, toUrl } from './urls.js';
 
 const SEARCH_PAGE = 200;
 // 開いているタブのフォルダ。ブックマークの ID は数字なので重ならない
@@ -35,18 +35,12 @@ export function createBookmarks({ onOpen }) {
     writeLocal('open', [...expanded]);
   }
 
-  function setIcon(img, url) {
-    const small = favicon(url, 16);
-    img.src = small;
-    img.srcset = `${small} 1x, ${favicon(url, 32)} 2x`;
-  }
-
   function item(node) {
     if (node.url) {
       const a = bmTemplate.content.firstElementChild.cloneNode(true);
       a.dataset.id = node.id;
       a.querySelector('span').textContent = node.title || node.url;
-      setIcon(a.querySelector('img'), node.url);
+      Object.assign(a.querySelector('img'), iconSources(node.url));
       if (/^javascript:/i.test(node.url)) {
         a.removeAttribute('href');
         a.classList.add('unsupported');
@@ -93,7 +87,7 @@ export function createBookmarks({ onOpen }) {
       el.removeAttribute('aria-disabled');
     }
     el.title = `${node.title}\n${node.url}`;
-    setIcon(el.querySelector('img'), node.url);
+    Object.assign(el.querySelector('img'), iconSources(node.url));
   }
 
   function tabItem(tab) {
@@ -103,7 +97,7 @@ export function createBookmarks({ onOpen }) {
     a.href = tab.url;
     a.title = `${tab.title}\n${tab.url}`;
     a.querySelector('span').textContent = tab.title || tab.url;
-    setIcon(a.querySelector('img'), tab.url);
+    Object.assign(a.querySelector('img'), iconSources(tab.url));
     return a;
   }
 

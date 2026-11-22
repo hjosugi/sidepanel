@@ -16,6 +16,12 @@ export function favicon(url, size) {
   return `/_favicon/?pageUrl=${encodeURIComponent(url)}&size=${size}`;
 }
 
+/** img に設定するファビコン。高解像度の画面には 2 倍の画像を使う */
+export function iconSources(url) {
+  const small = favicon(url, 16);
+  return { src: small, srcset: `${small} 1x, ${favicon(url, 32)} 2x` };
+}
+
 function parseHttp(text) {
   try {
     const url = new URL(text);
