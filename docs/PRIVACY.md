@@ -21,9 +21,10 @@ The extension processes the following data locally in the browser:
 - Cookies of the site open in the side panel (see below)
 - Response headers of side-panel frames, to detect errors and to remove nested
   frames that a site does not allow to be embedded
-- Extension settings: language, mobile layout, number of pages kept open, the page
-  shown when the panel opens, pinned sites (URL and name), sites shown in desktop
-  layout, and sites shown as in a normal tab
+- Extension settings: language, mobile layout, number of pages kept open, zoom
+  (the default and per site), the page shown when the panel opens, pinned sites
+  (URL and name), sites shown in desktop layout, and sites shown as in a normal
+  tab
 
 ## Local Processing
 

@@ -21,9 +21,19 @@
     <svg class="phone" aria-hidden="true" viewBox="0 0 16 16"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>
     <svg class="desktop" aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M5.5 14h5M8 11.5V14"/></svg>
   </button>
-  <button id="lang" title="言語 / Language" aria-label="言語 / Language">EN</button>
-  <button id="popout" disabled data-i18n-title="popout.label" data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
+  <button id="overflow" popovertarget="overflow-menu" aria-haspopup="true" aria-expanded="false" data-i18n-title="more.label" data-i18n-aria-label="more.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 3.5h.01M8 8h.01M8 12.5h.01" stroke-width="2.5"/></svg></button>
 </header>
+<div id="overflow-menu" popover data-i18n-aria-label="more.label" role="group">
+  <div class="menu-zoom" role="group" data-i18n-aria-label="zoom.label">
+    <span class="menu-label" data-i18n="zoom.label"></span>
+    <button id="zoom-out" disabled data-i18n-title="zoom.out" data-i18n-aria-label="zoom.out"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg></button>
+    <button id="zoom-reset" disabled class="menu-value">100%</button>
+    <button id="zoom-in" disabled data-i18n-title="zoom.in" data-i18n-aria-label="zoom.in"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
+  </div>
+  <button id="popout" class="menu-item" disabled data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg><span data-i18n="popout.label"></span></button>
+  <button id="lang" class="menu-item" aria-label="言語 / Language"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c-2 2-2 9 0 11M8 2.5c2 2 2 9 0 11"/></svg><span>言語 / Language</span><span id="lang-value" class="menu-value">EN</span></button>
+  <button id="menu-settings" class="menu-item"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></svg><span data-i18n="settings.label"></span></button>
+</div>
 <div id="dock" role="group" hidden data-i18n-aria-label="dock.label"></div>
 <div id="progress" aria-hidden="true"></div>
 <div id="notice" hidden role="status" aria-live="polite">

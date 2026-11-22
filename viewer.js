@@ -5,6 +5,7 @@ import { getLang, LANGS, setLang, t } from './i18n.js';
 import { watchPanelFrames } from './net.js';
 import { normalizeSettings, setSettings, writeLocal } from './store.js';
 import { displayUrl, hostOf, matchPin } from './urls.js';
+import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from './zoom.js';
 
 const LOGIN_HOSTS = [
   'accounts.google.com',
@@ -38,6 +39,12 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   const popout = document.getElementById('popout');
   const ua = document.getElementById('ua');
   const langButton = document.getElementById('lang');
+  const langValue = document.getElementById('lang-value');
+  const overflow = document.getElementById('overflow');
+  const overflowMenu = document.getElementById('overflow-menu');
+  const zoomOut = document.getElementById('zoom-out');
+  const zoomIn = document.getElementById('zoom-in');
+  const zoomReset = document.getElementById('zoom-reset');
 
   let settings = initialSettings;
   const pages = new Map();
@@ -156,9 +163,47 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     menu.setAttribute('aria-expanded', String(listOpen));
     menu.title = t(listOpen ? 'list.close' : 'list.open');
     menu.setAttribute('aria-label', menu.title);
-    langButton.textContent = getLang().toUpperCase();
-    langButton.title = t('lang.label');
-    langButton.setAttribute('aria-label', t('lang.label'));
+    langValue.textContent = getLang().toUpperCase();
+    langButton.setAttribute('aria-label', `${t('lang.label')}: ${getLang().toUpperCase()}`);
+    updateZoomControls();
+  }
+
+  function pageZoom(page) {
+    return zoomFor(hostOf(page.url), settings);
+  }
+
+  // iframe の CSS zoom はブラウザのズームと同じく、ページの表示幅と devicePixelRatio を変える
+  function applyZoom(page) {
+    const level = pageZoom(page);
+    page.iframe.style.zoom = level === 1 ? '' : String(level);
+  }
+
+  function updateZoomControls() {
+    const page = active();
+    const level = page ? pageZoom(page) : settings.zoom;
+    zoomReset.textContent = zoomPercent(level);
+    zoomReset.title = t('zoom.reset', { percent: zoomPercent(settings.zoom) });
+    zoomReset.setAttribute(
+      'aria-label',
+      `${t('zoom.label')} ${zoomPercent(level)}. ${zoomReset.title}`,
+    );
+    zoomReset.disabled = !page || level === settings.zoom;
+    zoomOut.disabled = !page || level === ZOOM_LEVELS[0];
+    zoomIn.disabled = !page || level === ZOOM_LEVELS.at(-1);
+  }
+
+  /** 表示中のサイトの倍率を変えて覚える。既定と同じならサイトごとの設定を消す */
+  async function setSiteZoom(level) {
+    const page = active();
+    const host = page && hostOf(page.url);
+    if (!host) return;
+    const siteZoom = { ...settings.siteZoom };
+    if (level === settings.zoom) delete siteZoom[host];
+    else siteZoom[host] = level;
+    settings = await setSettings({ siteZoom });
+    for (const other of pages.values()) applyZoom(other);
+    updateZoomControls();
+    announce(`${t('zoom.label')} ${zoomPercent(level)}`);
   }
 
   function updateNotice() {
@@ -314,6 +359,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     page.canGoBack = false;
     page.canGoForward = false;
     page.iframe.classList.remove('loaded');
+    applyZoom(page);
     page.iframe.src = url;
     page.iframe.title = t('app.name');
     setBusy(true);
@@ -404,6 +450,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
       } else {
         clearNotice(page);
       }
+      applyZoom(page);
       updateDock();
       if (page === active()) {
         updateTitle(page);
@@ -483,13 +530,36 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     announce(t(current ? 'pin.removed' : 'pin.added'));
   });
 
-  document
-    .getElementById('settings')
-    .addEventListener('click', () => chrome.runtime.openOptionsPage().catch(() => {}));
+  const openOptions = () => chrome.runtime.openOptionsPage().catch(() => {});
+  document.getElementById('settings').addEventListener('click', openOptions);
+
+  // ⋯ メニュー。項目を選んだら閉じる（ズームは続けて押せるよう開いたまま）
+  const closeMenu = () => {
+    if (overflowMenu.matches(':popover-open')) overflowMenu.hidePopover();
+  };
+  overflowMenu.addEventListener('toggle', (event) => {
+    overflow.setAttribute('aria-expanded', String(event.newState === 'open'));
+  });
+  // パネル内のページを押すとフォーカスが iframe に移る。そのクリックは popover に届かない
+  addEventListener('blur', closeMenu);
+  document.getElementById('menu-settings').addEventListener('click', () => {
+    closeMenu();
+    openOptions();
+  });
+  zoomIn.addEventListener('click', () => {
+    const page = active();
+    if (page) setSiteZoom(stepZoom(pageZoom(page), 1));
+  });
+  zoomOut.addEventListener('click', () => {
+    const page = active();
+    if (page) setSiteZoom(stepZoom(pageZoom(page), -1));
+  });
+  zoomReset.addEventListener('click', () => setSiteZoom(settings.zoom));
   back.addEventListener('click', () => command('back'));
   fwd.addEventListener('click', () => command('forward'));
   reload.addEventListener('click', reloadActive);
   popout.addEventListener('click', () => {
+    closeMenu();
     const page = active();
     if (page) chrome.tabs.create({ url: page.url }).catch(() => {});
   });
@@ -535,12 +605,14 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
       onLanguageChange?.();
     }
     trimPages(settings.maxPages);
+    for (const page of pages.values()) applyZoom(page);
     updateToolbar();
     updateNotice();
     updateDock();
   });
 
   langButton.addEventListener('click', async () => {
+    closeMenu();
     const lang = setLang(LANGS[(LANGS.indexOf(getLang()) + 1) % LANGS.length]);
     settings = await setSettings({ lang });
     updateToolbar();
@@ -557,7 +629,16 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
       address.focus();
       return;
     }
-    if (event.key !== 'Escape' || !isListOpen()) return;
+    // ブラウザと同じ Ctrl + / Ctrl - / Ctrl 0 で、表示中のサイトの倍率を変える。
+    // 日本語配列では + が ; のキーにあり、Chrome も Ctrl ; で拡大する
+    const zoomKey = { '=': 1, '+': 1, ';': 1, '-': -1, 0: 0 }[event.key];
+    if (mod && !event.altKey && active() && zoomKey !== undefined) {
+      event.preventDefault();
+      setSiteZoom(zoomKey ? stepZoom(pageZoom(active()), zoomKey) : settings.zoom);
+      return;
+    }
+    // メニューが開いていれば、Esc はメニューを閉じるだけにする
+    if (event.key !== 'Escape' || !isListOpen() || overflowMenu.matches(':popover-open')) return;
     if (q.value) {
       q.value = '';
       q.dispatchEvent(new Event('input'));

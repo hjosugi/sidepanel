@@ -63,3 +63,15 @@ test('unframed hosts default to Claude but can be emptied', () => {
     ['example.com'],
   );
 });
+
+test('zoom keeps only known levels and valid hosts', () => {
+  assert.equal(normalizeSettings({ zoom: 1.25 }).zoom, 1.25);
+  assert.equal(normalizeSettings({ zoom: 1.3 }).zoom, 1);
+  assert.equal(normalizeSettings({ zoom: '1.25' }).zoom, 1);
+  assert.deepEqual(
+    normalizeSettings({ siteZoom: { 'a.com': 1.5, 'b.com': 3, 'bad host': 1.5, 'c.com': 'x' } })
+      .siteZoom,
+    { 'a.com': 1.5 },
+  );
+  assert.deepEqual(normalizeSettings({ siteZoom: ['a.com'] }).siteZoom, {});
+});

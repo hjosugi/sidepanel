@@ -1,3 +1,5 @@
+import { DEFAULT_ZOOM, isZoomLevel } from './zoom.js';
+
 // 設定はバックグラウンドと共有するため chrome.storage.local、
 // パネル内の一時状態は localStorage に保存する。
 // 壊れた JSON で起動が止まらないよう、読み込みはすべて失敗時に既定値へ落とす。
@@ -13,9 +15,13 @@ export const DEFAULT_SETTINGS = {
   pins: [],
   startup: 'last',
   startUrl: '',
+  // パネル内のページの倍率。siteZoom はホスト名 → 倍率（既定と違うサイトだけ）
+  zoom: DEFAULT_ZOOM,
+  siteZoom: {},
 };
 export const MAX_PAGES = 5;
 export const MAX_PINS = 40;
+export const MAX_SITE_ZOOM = 200;
 /** パネルを開いたときに表示するもの: 前回のページ / 一覧 / startUrl */
 export const STARTUPS = ['last', 'list', 'url'];
 
@@ -56,6 +62,15 @@ function cleanPins(value) {
   return pins;
 }
 
+function cleanSiteZoom(value) {
+  const entries = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(entries)
+      .filter(([host, level]) => HOST.test(host) && isZoomLevel(level))
+      .slice(-MAX_SITE_ZOOM),
+  );
+}
+
 /** 保存値が壊れていても、使える形に揃えて返す。 */
 export function normalizeSettings(raw) {
   const saved = raw && typeof raw === 'object' ? raw : {};
@@ -75,6 +90,8 @@ export function normalizeSettings(raw) {
     pins: cleanPins(saved.pins),
     startup: STARTUPS.includes(saved.startup) ? saved.startup : DEFAULT_SETTINGS.startup,
     startUrl: httpUrl(saved.startUrl),
+    zoom: isZoomLevel(saved.zoom) ? saved.zoom : DEFAULT_ZOOM,
+    siteZoom: cleanSiteZoom(saved.siteZoom),
   };
 }
 

@@ -1,10 +1,14 @@
 import { getLang, setLang, t } from './i18n.js';
 import { getSettings, MAX_PAGES, normalizeSettings, readLocal, setSettings } from './store.js';
 import { displayUrl, hostOf, iconSources, toUrl } from './urls.js';
+import { ZOOM_LEVELS, zoomPercent } from './zoom.js';
 
 const lang = document.getElementById('lang');
 const mobile = document.getElementById('mobile');
 const pages = document.getElementById('pages');
+const zoom = document.getElementById('zoom');
+const siteZoom = document.getElementById('site-zoom');
+const siteZoomEmpty = document.getElementById('site-zoom-empty');
 const startups = [...document.querySelectorAll('input[name="startup"]')];
 const startForm = document.getElementById('start-form');
 const startUrl = document.getElementById('start-url');
@@ -28,6 +32,7 @@ setLang(settings.lang ?? 'en');
 for (let count = 1; count <= MAX_PAGES; count++) {
   pages.append(new Option(String(count), String(count)));
 }
+for (const level of ZOOM_LEVELS) zoom.append(new Option(zoomPercent(level), String(level)));
 
 function iconButton(text, label, onClick) {
   const button = document.createElement('button');
@@ -56,6 +61,29 @@ function hostList(list, empty, hosts, key) {
     }),
   );
   empty.hidden = hosts.length > 0;
+}
+
+function renderSiteZoom() {
+  const entries = Object.entries(settings.siteZoom);
+  siteZoom.replaceChildren(
+    ...entries.map(([host, level]) => {
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = host;
+      const value = document.createElement('span');
+      value.className = 'value';
+      value.textContent = zoomPercent(level);
+      const remove = iconButton('×', t('options.remove', { host }), () => {
+        const next = { ...settings.siteZoom };
+        delete next[host];
+        save({ siteZoom: next });
+      });
+      item.append(name, value, remove);
+      return item;
+    }),
+  );
+  siteZoomEmpty.hidden = entries.length > 0;
 }
 
 function movePin(from, to) {
@@ -97,11 +125,13 @@ function render() {
   lang.value = getLang();
   mobile.checked = settings.mobileUA;
   pages.value = String(settings.maxPages);
+  zoom.value = String(settings.zoom);
   for (const radio of startups) radio.checked = radio.value === settings.startup;
   if (document.activeElement !== startUrl) startUrl.value = settings.startUrl;
   startCurrent.disabled = !readLocal('last', null)?.url;
   startError.hidden = !(settings.startup === 'url' && !settings.startUrl);
   renderPins();
+  renderSiteZoom();
   hostList(desktop, desktopEmpty, settings.desktopHosts, 'desktopHosts');
   hostList(unframed, unframedEmpty, settings.unframedHosts, 'unframedHosts');
 }
@@ -131,6 +161,7 @@ lang.addEventListener('change', () => {
 });
 mobile.addEventListener('change', () => save({ mobileUA: mobile.checked }));
 pages.addEventListener('change', () => save({ maxPages: Number(pages.value) }));
+zoom.addEventListener('change', () => save({ zoom: Number(zoom.value) }));
 for (const radio of startups) {
   radio.addEventListener('change', () => {
     if (radio.checked) save({ startup: radio.value });

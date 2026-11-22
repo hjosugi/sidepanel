@@ -749,6 +749,66 @@ try {
     ),
   );
 
+  // zoom: the ⋯ menu and Ctrl + / - / 0 change the zoom of the visible site and remember it
+  await openBookmark(`${server.base}/page-a`);
+  const host = new URL(server.base).hostname;
+  const frameZoom = () =>
+    panel.evaluate("document.querySelector('#frames iframe:not([hidden])').style.zoom");
+  const siteZoom = async () => (await settingsValue('siteZoom'))?.[host];
+  await panel.evaluate('document.getElementById("overflow").click()');
+  await sleep(200);
+  check(
+    '⋯ button opens the menu',
+    await panel.evaluate(
+      `document.getElementById('overflow-menu').matches(':popover-open') &&
+        document.getElementById('overflow').getAttribute('aria-expanded') === 'true'`,
+    ),
+  );
+  await panel.evaluate('document.getElementById("zoom-in").click()');
+  await sleep(300);
+  check(
+    'zoom in enlarges the visible site and remembers it',
+    (await frameZoom()) === '1.1' &&
+      (await siteZoom()) === 1.1 &&
+      (await panel.evaluate('document.getElementById("zoom-reset").textContent')) === '110%',
+    `zoom=${await frameZoom()} saved=${await siteZoom()}`,
+  );
+  const ctrl = (key) =>
+    panel.evaluate(
+      `dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, ctrlKey: true, bubbles: true }))`,
+    );
+  await ctrl('-');
+  await sleep(200);
+  await ctrl('-');
+  await sleep(300);
+  check(
+    'Ctrl - zooms out',
+    (await frameZoom()) === '0.9' && (await siteZoom()) === 0.9,
+    `zoom=${await frameZoom()}`,
+  );
+  await ctrl('0');
+  await sleep(300);
+  check(
+    'Ctrl 0 resets to the default and forgets the site',
+    (await frameZoom()) === '' && (await siteZoom()) === undefined,
+  );
+  await panel.evaluate("document.getElementById('overflow-menu').hidePopover()");
+  await patchSettings({ zoom: 1.25 });
+  check('default zoom applies to open pages', (await frameZoom()) === '1.25');
+  await reset();
+  await openBookmark(`${server.base}/zoom-report`).catch(async () => {
+    await addBookmark(`${server.base}/zoom-report`, 'Zoom report');
+    await openBookmark(`${server.base}/zoom-report`);
+  });
+  await waitFor(async () => (await logs()).reports.length > 0, { timeout: 5000 }).catch(() => {});
+  const zoomReport = (await logs()).reports.at(-1);
+  check(
+    'the page sees the zoom like browser zoom',
+    Number(zoomReport?.dpr) === 1.25,
+    JSON.stringify(zoomReport),
+  );
+  await patchSettings({ zoom: 1, siteZoom: {} });
+
   // language switch
   await panel.evaluate('document.getElementById("lang").click()');
   await sleep(300);

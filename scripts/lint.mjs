@@ -129,5 +129,18 @@ for (const file of shipped) {
   }
 }
 
+// 同じ id が 2 つあると getElementById が別の要素を返す（静的な HTML と、JS で付ける id）
+const scriptIds = [...shipped]
+  .filter((file) => file.endsWith('.js'))
+  .flatMap((file) => [...read(file).matchAll(/\.id = '([\w-]+)'/g)].map(([, id]) => id));
+for (const file of shipped) {
+  if (!file.endsWith('.html')) continue;
+  const ids = [...read(file).matchAll(/\sid="([^"]+)"/g)].map(([, id]) => id);
+  const all = [...ids, ...scriptIds];
+  for (const id of new Set(ids)) {
+    if (all.filter((other) => other === id).length > 1) fail(`${file}: duplicate id "${id}"`);
+  }
+}
+
 if (failed) process.exit(1);
 console.log(`lint ok (${files.length} files, ${shipped.size} packaged)`);
