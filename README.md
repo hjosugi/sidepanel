@@ -35,7 +35,9 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 
 ## Install
 
-Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf). The first version is still in review, so the page opens only after it is approved. Until then:
+Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf).
+
+The store updates only after review, so the version there can lag behind this repository. To run the newest version instead:
 
 1. Download the zip from [Releases](https://github.com/hjosugi/sidepanel/releases) and extract it (or `git clone`)
 2. Open `chrome://extensions`, turn on **Developer mode**

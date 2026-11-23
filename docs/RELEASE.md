@@ -7,7 +7,7 @@ How the extension goes from `main` to GitHub Releases and the Chrome Web Store.
 
 ## Listing
 
-- Store page: <https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf> (item ID `idjfdgpakkmopepemimbpaaippmichdf`). The first version is in review; the page opens once it is approved
+- Store page: <https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf> (item ID `idjfdgpakkmopepemimbpaaippmichdf`)
 - Privacy policy: `docs/PRIVACY.md`. The listing links to its GitHub URL, so do not move or rename it
 - Support: GitHub issues
 

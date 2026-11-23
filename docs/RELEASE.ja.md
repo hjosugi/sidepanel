@@ -7,7 +7,7 @@
 
 ## 掲載情報
 
-- ストアのページ: <https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf>（アイテム ID `idjfdgpakkmopepemimbpaaippmichdf`）。初回の審査中で、承認後にページが開けるようになる
+- ストアのページ: <https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf>（アイテム ID `idjfdgpakkmopepemimbpaaippmichdf`）
 - プライバシーポリシー: `docs/PRIVACY.md`。掲載ページが GitHub の URL でリンクするので、移動や改名をしないこと
 - サポート: GitHub の issue
 

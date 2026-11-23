@@ -34,7 +34,9 @@ Chrome のサイドパネルにブックマークを並べ、クリックした�
 
 ## インストール
 
-[Chrome ウェブストア](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf)からインストールできます。初回の審査中のため、ページは承認後に開けるようになります。それまでは:
+[Chrome ウェブストア](https://chromewebstore.google.com/detail/idjfdgpakkmopepemimbpaaippmichdf)からインストールできます。
+
+ストアは審査を通ってから更新されるので、公開中のバージョンはこのリポジトリより古いことがあります。最新版を使うには:
 
 1. [Releases](https://github.com/hjosugi/sidepanel/releases) から zip をダウンロードして展開（または `git clone`）
 2. `chrome://extensions` を開き、**デベロッパーモード**をオン
