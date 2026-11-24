@@ -149,11 +149,21 @@ document.title = [framed ? 'framed' : 'top', reversed ? 'framed' : 'top', intact
       return;
     }
 
-    // パネルのズームはページの devicePixelRatio と表示幅に表れる
+    // パネルのズームはページの devicePixelRatio と表示幅に表れる。
+    // ブラウザのズームと同じく、ページの最初のスクリプトより少し遅れて届くことがあり
+    // （resize として届く）、そのたびに報告する
     if (path === '/zoom-report') {
       res.writeHead(200, { 'content-type': 'text/html' });
       res.end(`<!doctype html><title>Zoom</title><script>
-        fetch('/__report?dpr=' + devicePixelRatio + '&width=' + innerWidth);
+        let last = '';
+        const report = () => {
+          const view = devicePixelRatio + '/' + innerWidth;
+          if (view === last) return;
+          last = view;
+          fetch('/__report?dpr=' + devicePixelRatio + '&width=' + innerWidth);
+        };
+        report();
+        addEventListener('resize', report);
       </script>`);
       return;
     }

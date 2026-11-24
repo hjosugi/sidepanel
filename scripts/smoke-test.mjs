@@ -800,12 +800,15 @@ try {
     await addBookmark(`${server.base}/zoom-report`, 'Zoom report');
     await openBookmark(`${server.base}/zoom-report`);
   });
-  await waitFor(async () => (await logs()).reports.length > 0, { timeout: 5000 }).catch(() => {});
-  const zoomReport = (await logs()).reports.at(-1);
+  // The page may first see the unzoomed view and get the zoom as a resize right after,
+  // so wait for the report that has the zoom, not for any report.
+  const zoomed = (entry) => Number(entry.dpr) === 1.25;
+  await waitFor(async () => (await logs()).reports.some(zoomed), { timeout: 5000 }).catch(() => {});
+  const zoomReports = (await logs()).reports;
   check(
     'the page sees the zoom like browser zoom',
-    Number(zoomReport?.dpr) === 1.25,
-    JSON.stringify(zoomReport),
+    zoomReports.some(zoomed),
+    `want a report with dpr 1.25, reports seen: ${JSON.stringify(zoomReports)}`,
   );
   await patchSettings({ zoom: 1, siteZoom: {} });
 
