@@ -1,11 +1,12 @@
-import { displayUrl, toUrl } from './urls.js';
+import { t } from './i18n.js';
+import { addressTarget, displayUrl } from './urls.js';
 
 /**
  * アドレス欄。ふだんは https:// を省いた URL を、編集中は完全な URL を表示する
  * （ページのタイトルはタブに出る）。
- * Enter で、URL として読める入力は onOpen に、それ以外は onSearch に渡す。
+ * Enter で Web アドレスまたは検索結果をパネルに開く。
  */
-export function createAddressBar({ input, onOpen, onSearch }) {
+export function createAddressBar({ input, onOpen }) {
   let url = '';
   // クリックで入ったときも全体を選択したままにする（mouseup で選択が解除されるため）
   let keepSelection = false;
@@ -26,8 +27,10 @@ export function createAddressBar({ input, onOpen, onSearch }) {
   });
   input.addEventListener('blur', () => {
     keepSelection = false;
+    input.setCustomValidity('');
     show();
   });
+  input.addEventListener('input', () => input.setCustomValidity(''));
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       // 一覧を閉じる Esc より先に、編集だけを取り消す
@@ -40,10 +43,14 @@ export function createAddressBar({ input, onOpen, onSearch }) {
     event.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    const target = toUrl(text);
+    const target = addressTarget(text);
+    if (!target) {
+      input.setCustomValidity(t('address.unsupported'));
+      input.reportValidity();
+      return;
+    }
     input.blur();
-    if (target) onOpen(target);
-    else onSearch(text);
+    onOpen(target);
   });
 
   return {

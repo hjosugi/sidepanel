@@ -1,14 +1,14 @@
 import { t } from './i18n.js';
 import { readLocal, writeLocal } from './store.js';
-import { createTabs } from './tabs.js';
-import { iconSources, toUrl } from './urls.js';
+import { iconSources, toUrl, webSearchUrl } from './urls.js';
 
 const SEARCH_PAGE = 200;
 // 開いているタブのフォルダ。ブックマークの ID は数字なので重ならない
 const TABS_ID = 'tabs';
 
-export function createBookmarks({ onOpen }) {
+export function createBookmarks({ tabs, onOpen }) {
   const q = document.getElementById('q');
+  const webSearch = document.getElementById('web-search');
   const tree = document.getElementById('tree');
   const empty = document.getElementById('empty');
   const status = document.getElementById('status');
@@ -23,7 +23,7 @@ export function createBookmarks({ onOpen }) {
   let timer;
   let tabsTimer;
   let tabsOpen = readLocal('tabsOpen', true) !== false;
-  const tabs = createTabs({ onChange: scheduleTabsRender });
+  tabs.onChange(scheduleTabsRender);
 
   const visible = () => document.body.classList.contains('list');
 
@@ -449,7 +449,7 @@ export function createBookmarks({ onOpen }) {
         return;
       }
       event.preventDefault();
-      onOpen(a.href, a.querySelector('span').textContent);
+      onOpen(a.href, a.querySelector('span').textContent, { force: Boolean(a.dataset.tabId) });
     },
     true,
   );
@@ -514,22 +514,39 @@ export function createBookmarks({ onOpen }) {
     }
   });
 
-  q.addEventListener('input', scheduleRender);
-  q.addEventListener('keydown', (event) => {
+  function updateWebSearch() {
+    const query = q.value.trim();
+    webSearch.hidden = !query;
+    webSearch.querySelector('span').textContent = t('search.web', { query });
+  }
+
+  webSearch.addEventListener('click', () => {
+    const query = q.value.trim();
+    if (query) onOpen(webSearchUrl(query), '', { force: true });
+  });
+  q.addEventListener('input', () => {
+    updateWebSearch();
+    scheduleRender();
+  });
+  q.addEventListener('keydown', async (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       rows()[0]?.focus();
-    } else if (event.key === 'Enter') {
+    } else if (event.key === 'Enter' && !event.isComposing) {
       const query = q.value.trim();
       if (!query) return;
+      event.preventDefault();
+      if (searchState?.query !== query) {
+        clearTimeout(timer);
+        await render();
+      }
+      if (!visible() || q.value.trim() !== query || searchState?.query !== query) return;
       const first = tree.querySelector('.bm:not(.unsupported)');
       // 一致するものがなく、URL として読めるならそのページを開く
       const url = first ? null : toUrl(query);
       if (first) {
-        event.preventDefault();
         first.click();
       } else if (url) {
-        event.preventDefault();
         onOpen(url, '', { force: true });
       }
     }
@@ -547,6 +564,7 @@ export function createBookmarks({ onOpen }) {
       }
     },
     updateLanguage() {
+      updateWebSearch();
       if (visible()) render();
       else dirty = true;
     },

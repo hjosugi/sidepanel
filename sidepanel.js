@@ -1,6 +1,7 @@
 import { createBookmarks } from './bookmarks.js';
 import { setLang } from './i18n.js';
 import { getSettings, readLocal } from './store.js';
+import { createTabs } from './tabs.js';
 import { createViewer } from './viewer.js';
 
 // バックグラウンドはこの接続がある間だけパネル用のルールを有効にする（#7）。
@@ -20,12 +21,15 @@ const settings = prepared?.settings ?? (await getSettings());
 setLang(settings.lang ?? 'en');
 
 let viewer;
+const tabs = createTabs();
 const bookmarks = createBookmarks({
+  tabs,
   onOpen: (url, name, options) => viewer.openUrl(url, name, options),
 });
 
 viewer = createViewer({
   settings,
+  tabs,
   onListShown: () => bookmarks.onListShown(),
   onLanguageChange: () => bookmarks.updateLanguage(),
 });

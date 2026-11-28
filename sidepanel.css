@@ -123,12 +123,20 @@ body.list #menu .close {
   anchor-name: --overflow;
 }
 #overflow-menu {
-  position: fixed;
   inset: 38px 4px auto auto;
   position-anchor: --overflow;
   top: calc(anchor(bottom) + 4px);
   right: anchor(right);
   min-width: 210px;
+}
+#dock-menu {
+  inset: auto;
+  min-width: 150px;
+}
+#overflow-menu,
+#dock-menu {
+  position: fixed;
+  max-width: calc(100vw - 8px);
   margin: 0;
   padding: 4px;
   border: 1px solid var(--line);
@@ -160,6 +168,19 @@ body.list #menu .close {
 }
 .menu-item span:first-of-type {
   flex: 1;
+}
+.menu-item svg {
+  flex: none;
+}
+#list-actions {
+  flex: none;
+  padding: 0 4px 4px;
+  border-bottom: 1px solid var(--line);
+}
+#action-error {
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--notice);
 }
 .menu-value {
   width: auto;
@@ -345,9 +366,13 @@ summary:focus-visible,
   outline-offset: -2px;
 }
 summary span,
-.bm span {
+.bm span,
+#web-search span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+#web-search span {
+  white-space: nowrap;
 }
 summary {
   list-style: none;
@@ -387,7 +412,7 @@ summary .count {
   cursor: default;
 }
 
-#overflow {
+#more {
   display: block;
   width: auto;
   height: 28px;
@@ -518,7 +543,7 @@ summary .count {
   height: 20px;
   margin-right: 5px;
   border-radius: 50%;
-  visibility: hidden;
+  opacity: 0.7;
 }
 .dock-close svg {
   width: 12px;
@@ -527,7 +552,7 @@ summary .count {
 .dock-item.current .dock-close,
 .dock-item:hover .dock-close,
 .dock-close:focus-visible {
-  visibility: visible;
+  opacity: 1;
 }
 .dock-new {
   flex: none;

@@ -6,16 +6,15 @@
 Sidepanel Bookmarks is a Chrome extension that shows the user's bookmarks in the
 side panel and opens them inside the side panel.
 
-Last updated: 2026-11-22
+Last updated: 2026-11-28
 
 ## Data Processed
 
 The extension processes the following data locally in the browser:
 
 - Bookmarks, to show them as a tree and to search them
-- The URL and title of the `http(s)` tabs open in the current window, to list and
-  search them in the side panel; they are read when the list is shown and are not
-  stored
+- The URL and title of the HTTP and HTTPS tabs in the panel's window, to show and
+  filter the list and to open the current tab when requested
 - The URL and title of pages opened in the side panel, to show them in the panel
   header and tab strip; the last URL is remembered so the panel can reopen it
 - Cookies of the site open in the side panel (see below)
@@ -28,9 +27,10 @@ The extension processes the following data locally in the browser:
 
 ## Local Processing
 
-Everything runs on the user's device. Bookmarks, page URLs, cookies and settings
-are not sent to the developer or to any server. The extension has no analytics
-and no advertising.
+The extension filters bookmarks and open tabs on the user's device. It has no
+analytics or advertising. Submitting a web search in the address bar or choosing
+**Search Bing** in the list sends the submitted words directly to Microsoft Bing.
+Typing in either field makes no search requests.
 
 Pages opened in the side panel are loaded directly from those sites, exactly as
 in a normal tab, and are subject to those sites' own privacy policies.

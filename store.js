@@ -104,14 +104,28 @@ export async function getSettings() {
   }
 }
 
-export async function setSettings(patch) {
-  const current = await getSettings();
-  const next = normalizeSettings({ ...current, ...patch });
-  try {
-    await chrome.storage.local.set({ settings: next });
-  } catch {
-    // 保存できなくても表示だけは続ける
-  }
+export function setSettings(patch) {
+  // 別のウィンドウのパネルや設定画面も同じ設定オブジェクトを更新する。
+  return navigator.locks.request('sidepanel-settings', async () => {
+    const current = await getSettings();
+    const changes = typeof patch === 'function' ? patch(current) : patch;
+    const next = normalizeSettings({ ...current, ...changes });
+    try {
+      await chrome.storage.local.set({ settings: next });
+    } catch {
+      // 保存できなくても表示だけは続ける
+    }
+    return next;
+  });
+}
+
+export function reorderPins(pins, sourceUrl, targetUrl) {
+  const from = pins.findIndex((pin) => pin.url === sourceUrl);
+  const to = pins.findIndex((pin) => pin.url === targetUrl);
+  if (from < 0 || to < 0 || from === to) return pins;
+  const next = [...pins];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
   return next;
 }
 

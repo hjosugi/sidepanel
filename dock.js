@@ -1,4 +1,5 @@
 import { t } from './i18n.js';
+import { MAX_PINS } from './store.js';
 import { iconSources, matchPin } from './urls.js';
 
 const PIN_TYPE = 'application/x-sidepanel-pin';
@@ -24,9 +25,21 @@ export function assignPages(pins, pages) {
  * ピンは Chrome の固定タブのように左端にアイコンだけで並び、そのサイトのページを表す。
  * ほかのページはファビコン・タイトル・閉じるボタンのあるタブになる。
  */
-export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMovePin, onNewTab }) {
+export function createDock({
+  element,
+  onSelectPage,
+  onOpenPin,
+  onClosePage,
+  onTogglePin,
+  onMovePin,
+  onNewTab,
+}) {
+  const menu = document.getElementById('dock-menu');
+  const togglePin = document.getElementById('dock-toggle-pin');
+  const close = document.getElementById('dock-close-page');
   let pins = [];
   let pages = [];
+  let menuTarget = null;
 
   function item(kind, url, label, page, current) {
     const tab = document.createElement('div');
@@ -37,6 +50,7 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
     open.type = 'button';
     open.className = 'dock-open';
     open.setAttribute('aria-label', label);
+    open.setAttribute('aria-keyshortcuts', 'Shift+F10');
     const img = document.createElement('img');
     Object.assign(img, { alt: '' }, iconSources(url));
     open.append(img);
@@ -85,10 +99,13 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
    * @param {(page: object) => string} state.label ページの表示名
    */
   function render(state) {
+    const focused = document.activeElement?.closest('.dock-item');
+    const focusClose = document.activeElement?.classList.contains('dock-close');
     pins = state.pins;
     pages = state.pages;
     element.hidden = !pins.length && !pages.length;
     if (element.hidden) {
+      menu.hidePopover();
       element.replaceChildren();
       return;
     }
@@ -105,6 +122,14 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
       items.push(item('tab', page.url, state.label(page), page, state.current));
     }
     element.replaceChildren(...items, newTabButton());
+    if (focused) {
+      const tab = findItem(focused.dataset) ?? element.querySelector('.current, .dock-item');
+      const button = focusClose && tab?.querySelector('.dock-close');
+      (button || tab?.querySelector('.dock-open') || element.querySelector('.dock-new')).focus({
+        preventScroll: true,
+      });
+    }
+    if (menu.matches(':popover-open')) updateMenu();
     element
       .querySelector('[aria-current]')
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -114,6 +139,87 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
     const id = target.closest('.dock-item')?.dataset.pageId;
     return pages.find((page) => String(page.id) === id) ?? null;
   }
+
+  function findItem(target) {
+    if (!target) return null;
+    const { pageId, url } = target;
+    if (pageId) return element.querySelector(`[data-page-id="${CSS.escape(pageId)}"]`);
+    return element.querySelector(`.pin[data-url="${CSS.escape(url)}"]`);
+  }
+
+  function updateMenu() {
+    const tab = findItem(menuTarget);
+    if (!tab) {
+      menu.hidePopover();
+      return;
+    }
+    const pinned = tab.dataset.pin !== undefined;
+    togglePin.textContent = t(pinned ? 'pin.remove' : 'pin.add');
+    togglePin.disabled = !pinned && pins.length >= MAX_PINS;
+    close.disabled = !pageOf(tab);
+  }
+
+  function openMenu(tab, x, y) {
+    menuTarget = { ...tab.dataset };
+    tab.querySelector('.dock-open').focus({ preventScroll: true });
+    updateMenu();
+    menu.showPopover();
+    menu.style.left = `${Math.max(0, Math.min(x, innerWidth - menu.offsetWidth))}px`;
+    menu.style.top = `${Math.max(0, Math.min(y, innerHeight - menu.offsetHeight))}px`;
+    menu.querySelector('button:enabled')?.focus();
+  }
+
+  element.addEventListener('contextmenu', (event) => {
+    const tab = event.target.closest('.dock-item');
+    if (!tab) return;
+    event.preventDefault();
+    openMenu(tab, event.clientX, event.clientY);
+  });
+  element.addEventListener('keydown', (event) => {
+    if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+    const tab = event.target.closest('.dock-item');
+    if (!tab) return;
+    event.preventDefault();
+    const { left, bottom } = tab.getBoundingClientRect();
+    openMenu(tab, left, bottom);
+  });
+  menu.addEventListener('click', (event) => {
+    const tab = findItem(menuTarget);
+    const button = event.target.closest('button');
+    if (!tab || !button) return;
+    const page = pageOf(tab);
+    menu.hidePopover();
+    tab.querySelector('.dock-open').focus({ preventScroll: true });
+    if (button === togglePin) onTogglePin(page, pins[Number(tab.dataset.pin)]);
+    else if (page && button === close) onClosePage(page);
+  });
+  menu.addEventListener('keydown', (event) => {
+    const buttons = [...menu.querySelectorAll('button:enabled')];
+    let target;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowUp':
+        target = buttons.find((button) => button !== document.activeElement);
+        break;
+      case 'Home':
+        target = buttons[0];
+        break;
+      case 'End':
+        target = buttons.at(-1);
+        break;
+      case 'Escape':
+        event.preventDefault();
+        event.stopPropagation();
+        menu.hidePopover();
+        findItem(menuTarget)?.querySelector('.dock-open').focus();
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    target?.focus();
+  });
+  addEventListener('blur', () => menu.hidePopover());
 
   element.addEventListener('click', (event) => {
     if (event.target.closest('.dock-new')) {
@@ -150,7 +256,7 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
   element.addEventListener('dragstart', (event) => {
     const button = event.target.closest('.dock-item[data-pin]');
     if (!button) return;
-    event.dataTransfer.setData(PIN_TYPE, button.dataset.pin);
+    event.dataTransfer.setData(PIN_TYPE, button.dataset.url);
     event.dataTransfer.effectAllowed = 'move';
   });
   element.addEventListener('dragover', (event) => {
@@ -161,12 +267,10 @@ export function createDock({ element, onSelectPage, onOpenPin, onClosePage, onMo
   });
   element.addEventListener('drop', (event) => {
     const target = event.target.closest('.dock-item[data-pin]');
-    const raw = event.dataTransfer.getData(PIN_TYPE);
-    if (!target || raw === '') return;
+    const from = event.dataTransfer.getData(PIN_TYPE);
+    if (!target || !from) return;
     event.preventDefault();
-    const from = Number(raw);
-    const to = Number(target.dataset.pin);
-    if (Number.isInteger(from) && from !== to) onMovePin(from, to);
+    if (from !== target.dataset.url) onMovePin(from, target.dataset.url);
   });
 
   return { render };

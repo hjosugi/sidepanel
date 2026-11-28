@@ -8,12 +8,19 @@ const MESSAGES = {
     'back.label': 'Back',
     'forward.label': 'Forward',
     'reload.label': 'Reload',
-    'popout.label': 'Open in tab',
+    'popout.label': 'Open a copy in a new browser tab',
+    'tab.import': 'Open current browser tab in panel',
+    'tab.move': 'Move panel page to a new browser tab',
+    'tab.close': 'Close panel tab',
+    'tab.actions': 'Panel tab actions',
+    'tab.unavailable': 'Select a browser tab with an HTTP or HTTPS page, then try again.',
+    'tab.openFailed': 'Could not open a browser tab. The page is still in the panel.',
     'mobile.label': 'Use mobile layout',
     'desktop.label': 'Use desktop layout',
     'lang.label': '言語 / Language',
-    'address.label': 'Address',
-    'address.placeholder': 'Enter an address or search',
+    'address.label': 'Web address or Bing search',
+    'address.placeholder': 'Enter URL or search Bing',
+    'address.unsupported': 'Enter an HTTP or HTTPS address, or words to search for.',
     'pin.add': 'Pin to the bar',
     'pin.remove': 'Unpin from the bar',
     'pin.added': 'Pinned',
@@ -27,6 +34,7 @@ const MESSAGES = {
     'zoom.out': 'Zoom out',
     'zoom.reset': 'Reset to {percent}',
     'search.placeholder': 'Search bookmarks and tabs',
+    'search.web': 'Search Bing for “{query}”',
     'empty.none': 'No bookmarks or tabs',
     'empty.search': 'No matches',
     'search.more': 'Show more ({count} remaining)',
@@ -98,12 +106,20 @@ const MESSAGES = {
     'back.label': '戻る',
     'forward.label': '進む',
     'reload.label': '再読み込み',
-    'popout.label': 'タブで開く',
+    'popout.label': 'コピーを新しいブラウザータブで開く',
+    'tab.import': '現在のブラウザータブをパネルで開く',
+    'tab.move': 'パネルのページを新しいブラウザータブに移動',
+    'tab.close': 'パネルのタブを閉じる',
+    'tab.actions': 'パネルのタブ操作',
+    'tab.unavailable':
+      'HTTP または HTTPS のページをブラウザーで選んでから、もう一度お試しください。',
+    'tab.openFailed': 'ブラウザータブを開けませんでした。ページはパネルに残っています。',
     'mobile.label': 'モバイル表示にする',
     'desktop.label': 'デスクトップ表示にする',
     'lang.label': '言語 / Language',
-    'address.label': 'アドレス',
-    'address.placeholder': 'アドレスを入力、または検索',
+    'address.label': 'ウェブアドレスまたは Bing 検索',
+    'address.placeholder': 'URL を入力、または Bing で検索',
+    'address.unsupported': 'HTTP または HTTPS のアドレスか、検索する言葉を入力してください。',
     'pin.add': 'バーにピン留め',
     'pin.remove': 'バーのピン留めを外す',
     'pin.added': 'ピン留めしました',
@@ -117,6 +133,7 @@ const MESSAGES = {
     'zoom.out': '縮小',
     'zoom.reset': '{percent} に戻す',
     'search.placeholder': 'ブックマークとタブを検索',
+    'search.web': '「{query}」を Bing で検索',
     'empty.none': 'ブックマークもタブもありません',
     'empty.search': '見つかりません',
     'search.more': 'さらに表示（残り {count} 件）',
@@ -205,7 +222,7 @@ export function t(key, params = {}) {
   const table = MESSAGES[lang] ?? MESSAGES[DEFAULT_LANG];
   let text = table[key] ?? MESSAGES[DEFAULT_LANG][key] ?? key;
   for (const [name, value] of Object.entries(params)) {
-    text = text.replaceAll(`{${name}}`, String(value));
+    text = text.replaceAll(`{${name}}`, () => String(value));
   }
   return text;
 }

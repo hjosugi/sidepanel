@@ -1,5 +1,12 @@
 import { getLang, setLang, t } from './i18n.js';
-import { getSettings, MAX_PAGES, normalizeSettings, readLocal, setSettings } from './store.js';
+import {
+  getSettings,
+  MAX_PAGES,
+  normalizeSettings,
+  readLocal,
+  reorderPins,
+  setSettings,
+} from './store.js';
 import { displayUrl, hostOf, iconSources, toUrl } from './urls.js';
 import { ZOOM_LEVELS, zoomPercent } from './zoom.js';
 
@@ -87,16 +94,13 @@ function renderSiteZoom() {
 }
 
 function movePin(from, to) {
-  const next = [...settings.pins];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved);
-  save({ pins: next });
+  save(({ pins }) => ({ pins: reorderPins(pins, from, to) }));
 }
 
 function renderPins() {
   const count = settings.pins.length;
   pins.replaceChildren(
-    ...settings.pins.map((pin, index) => {
+    ...settings.pins.map((pin, index, list) => {
       const name = pin.name || displayUrl(pin.url);
       const item = document.createElement('li');
       const img = document.createElement('img');
@@ -105,12 +109,16 @@ function renderPins() {
       text.className = 'name';
       text.textContent = name;
       text.title = pin.url;
-      const up = iconButton('↑', t('options.up', { name }), () => movePin(index, index - 1));
-      const down = iconButton('↓', t('options.down', { name }), () => movePin(index, index + 1));
+      const up = iconButton('↑', t('options.up', { name }), () =>
+        movePin(pin.url, list[index - 1]?.url),
+      );
+      const down = iconButton('↓', t('options.down', { name }), () =>
+        movePin(pin.url, list[index + 1]?.url),
+      );
       up.disabled = index === 0;
       down.disabled = index === count - 1;
       const remove = iconButton('×', t('options.unpin', { name }), () =>
-        save({ pins: settings.pins.filter((_pin, other) => other !== index) }),
+        save(({ pins }) => ({ pins: pins.filter((item) => item.url !== pin.url) })),
       );
       item.append(img, text, up, down, remove);
       return item;

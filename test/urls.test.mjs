@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { matchPin, pageKey, toUrl } from '../urls.js';
+import { addressTarget, matchPin, pageKey, toUrl, webSearchUrl } from '../urls.js';
 
 test('toUrl adds https to host names', () => {
   assert.equal(toUrl('example.com'), 'https://example.com/');
@@ -33,6 +33,31 @@ test('toUrl rejects search words and other schemes', () => {
     'file:///etc/passwd',
   ]) {
     assert.equal(toUrl(text), null, text);
+  }
+});
+
+test('the address bar keeps URLs and sends search terms as a single Bing query', () => {
+  assert.equal(addressTarget('example.com/a?b=1#c'), 'https://example.com/a?b=1#c');
+  const text = 'site:example.com 日本語 & C++ #1';
+  const result = new URL(addressTarget(`  ${text}  `));
+  assert.equal(result.origin + result.pathname, 'https://www.bing.com/search');
+  assert.deepEqual([...result.searchParams], [['q', text]]);
+  assert.equal(result.hash, '');
+  assert.equal(webSearchUrl(text), result.href);
+});
+
+test('empty input and non-web addresses are not submitted as search terms', () => {
+  for (const input of [
+    ' ',
+    'chrome://settings',
+    'edge://favorites',
+    'file:///tmp/private',
+    'about:blank',
+    'javascript:alert(1)',
+    'mailto:a@example.com',
+    'https://',
+  ]) {
+    assert.equal(addressTarget(input), null, input);
   }
 });
 

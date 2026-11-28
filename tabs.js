@@ -1,7 +1,7 @@
 // パネルがあるウィンドウで開いているタブ。<all_urls> のホスト権限があるので、
 // tabs 権限なしで http(s) のタブの URL とタイトルを読める。
 
-export function createTabs({ onChange }) {
+export function createTabs() {
   let windowId = null;
   const ready = chrome.windows
     .getCurrent()
@@ -10,17 +10,29 @@ export function createTabs({ onChange }) {
     })
     .catch(() => {});
 
-  async function list() {
+  async function list(filter = {}) {
     await ready;
     let tabs = [];
     try {
-      tabs = await chrome.tabs.query(windowId === null ? { currentWindow: true } : { windowId });
+      const scope = windowId === null ? { currentWindow: true } : { windowId };
+      tabs = await chrome.tabs.query({ ...scope, ...filter });
     } catch {
       tabs = [];
     }
     return tabs
       .filter((tab) => /^https?:/i.test(tab.url ?? ''))
       .map(({ id, url, title }) => ({ id, url, title: title || '' }));
+  }
+
+  async function current() {
+    const [tab] = await list({ active: true });
+    return tab ?? null;
+  }
+
+  async function open(url) {
+    await ready;
+    if (windowId === null || !/^https?:\/\//i.test(url)) throw new Error('No web tab destination');
+    return chrome.tabs.create({ windowId, url, active: true });
   }
 
   /** chrome.bookmarks.search と同じく、すべての語を含むタブを返す。 */
@@ -41,15 +53,17 @@ export function createTabs({ onChange }) {
     }
   }
 
-  const mine = (id) => id === windowId;
-  chrome.tabs.onCreated.addListener((tab) => mine(tab.windowId) && onChange());
-  chrome.tabs.onRemoved.addListener((_id, info) => mine(info.windowId) && onChange());
-  chrome.tabs.onMoved.addListener((_id, info) => mine(info.windowId) && onChange());
-  chrome.tabs.onAttached.addListener((_id, info) => mine(info.newWindowId) && onChange());
-  chrome.tabs.onDetached.addListener((_id, info) => mine(info.oldWindowId) && onChange());
-  chrome.tabs.onUpdated.addListener((_id, info, tab) => {
-    if (mine(tab.windowId) && ('url' in info || 'title' in info)) onChange();
-  });
+  function onChange(notify) {
+    const mine = (id) => id === windowId;
+    chrome.tabs.onCreated.addListener((tab) => mine(tab.windowId) && notify());
+    chrome.tabs.onRemoved.addListener((_id, info) => mine(info.windowId) && notify());
+    chrome.tabs.onMoved.addListener((_id, info) => mine(info.windowId) && notify());
+    chrome.tabs.onAttached.addListener((_id, info) => mine(info.newWindowId) && notify());
+    chrome.tabs.onDetached.addListener((_id, info) => mine(info.oldWindowId) && notify());
+    chrome.tabs.onUpdated.addListener((_id, info, tab) => {
+      if (mine(tab.windowId) && ('url' in info || 'title' in info)) notify();
+    });
+  }
 
-  return { list, search, activate };
+  return { list, current, open, search, activate, onChange };
 }

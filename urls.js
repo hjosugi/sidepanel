@@ -53,6 +53,28 @@ export function toUrl(input) {
   return parseHttp(`${local ? 'http' : 'https'}://${text}`);
 }
 
+export function webSearchUrl(query) {
+  const url = new URL('https://www.bing.com/search');
+  url.searchParams.set('q', query.trim());
+  return url.href;
+}
+
+/** ブラウザ内部の URL や bookmarklet を誤って外部の検索に送らない。 */
+export function addressTarget(text) {
+  const url = toUrl(text);
+  if (url) return url;
+  const query = text.trim();
+  if (
+    !query ||
+    /^(?:[a-z][a-z0-9+.-]*:\/\/|(?:about|blob|brave|chrome(?:-extension)?|data|edge|file|ftp|https?|javascript|mailto|view-source):)/i.test(
+      query,
+    )
+  ) {
+    return null;
+  }
+  return webSearchUrl(query);
+}
+
 /** 同じページかどうかを比べるキー。末尾の / と # 以降の違いは無視する。 */
 export function pageKey(url) {
   try {

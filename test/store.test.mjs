@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_SETTINGS, MAX_PAGES, MAX_PINS, normalizeSettings } from '../store.js';
+import { DEFAULT_SETTINGS, MAX_PAGES, MAX_PINS, normalizeSettings, reorderPins } from '../store.js';
 
 test('defaults', () => {
   assert.deepEqual(normalizeSettings(), DEFAULT_SETTINGS);
   assert.deepEqual(normalizeSettings('broken'), DEFAULT_SETTINGS);
+});
+
+test('pin reordering uses the saved URLs if another panel added or removed a pin', () => {
+  const a = { url: 'https://a.example/' };
+  const b = { url: 'https://b.example/' };
+  const c = { url: 'https://c.example/' };
+  const pins = [c, a, b];
+  assert.deepEqual(reorderPins(pins, b.url, a.url), [c, b, a]);
+  assert.deepEqual(reorderPins(pins, a.url, b.url), [c, b, a]);
+  assert.deepEqual(reorderPins(pins, 'https://removed.example/', b.url), pins);
 });
 
 test('maxPages is clamped', () => {

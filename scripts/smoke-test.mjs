@@ -21,6 +21,7 @@ const server = await startServer();
 // EXTENSION_DIR で展開済みの配布 zip を検証できる（CI はこちらを使う）
 const brave = await launchBrave(
   process.env.EXTENSION_DIR ?? new URL('..', import.meta.url).pathname,
+  { extraArgs: ['--host-resolver-rules=MAP www.bing.com ~NOTFOUND'] },
 );
 let panel;
 let launcherPage;
@@ -70,6 +71,15 @@ async function search(text) {
   })()`);
 }
 
+async function submitAddress(text) {
+  await panel.evaluate(`(() => {
+    const address = document.getElementById('address');
+    address.focus();
+    address.value = ${JSON.stringify(text)};
+    address.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  })()`);
+}
+
 /** URL が prefix で始まるアイコンのバーの項目を押す */
 async function clickDock(prefix) {
   const clicked = await panel.evaluate(`(() => {
@@ -80,6 +90,21 @@ async function clickDock(prefix) {
   })()`);
   await sleep(300);
   return clicked;
+}
+
+async function tabAction(selector, action, keyboard = false) {
+  return panel.evaluate(`(() => {
+    const tab = document.querySelector(${JSON.stringify(selector)});
+    if (!tab) return false;
+    const event = ${keyboard}
+      ? new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true })
+      : new MouseEvent('contextmenu', { bubbles: true, clientX: 30, clientY: 50 });
+    tab.querySelector('.dock-open').dispatchEvent(event);
+    const button = document.getElementById(${JSON.stringify(action)});
+    if (!document.getElementById('dock-menu').matches(':popover-open') || button.disabled) return false;
+    button.click();
+    return true;
+  })()`);
 }
 
 // 表示中のページのタイトル（iframe の title に入る）
@@ -134,7 +159,7 @@ try {
   panel.on('Runtime.consoleAPICalled', ({ type, args }) => {
     if (type === 'error') errors.push(args.map((arg) => arg.value ?? arg.description).join(' '));
   });
-  await waitFor(() => panel.evaluate('Boolean(document.getElementById("tree"))'));
+  await waitFor(() => panel.evaluate('Boolean(document.getElementById("menu")?.title)'));
   await closeTarget(brave.port, launcher.id);
   launcherPage.close();
   launcherPage = null;
@@ -148,7 +173,7 @@ try {
   check(
     'toolbar buttons have accessible names',
     await panel.evaluate(
-      `(() => ['menu','back','fwd','reload','pin','address','popout'].every((id) => document.getElementById(id).getAttribute('aria-label')))()`,
+      `(() => ['menu','back','fwd','reload','pin','address','popout','move-to-tab'].every((id) => document.getElementById(id).getAttribute('aria-label')))()`,
     ),
   );
 
@@ -398,6 +423,36 @@ try {
   await sleep(300);
   check('pin button unpins the page', (await settingsValue('pins'))?.length === 0);
 
+  // Target the background tab and a closed pin without changing the visible page.
+  const tabB = `#dock .dock-item[data-url^="${base2}"]`;
+  await clickDock(server.base);
+  const pinnedBackground = await tabAction(tabB, 'dock-toggle-pin');
+  await waitFor(() => panel.evaluate("Boolean(document.querySelector('#dock .pin[data-alive]'))"));
+  check(
+    'right-click pins a background tab without selecting it',
+    pinnedBackground &&
+      (await panel.evaluate("document.getElementById('address').title")).startsWith(server.base),
+  );
+  const closedPin = await tabAction(tabB, 'dock-close-page', true);
+  check(
+    'keyboard tab menu closes a pinned page and keeps its shortcut',
+    closedPin &&
+      (await panel.evaluate("Boolean(document.querySelector('#dock .pin:not([data-alive])'))")),
+  );
+  await clickDock(base2);
+  check(
+    'a closed pin reopens the page',
+    await panel.evaluate("Boolean(document.querySelector('#dock .pin.current[data-alive]'))"),
+  );
+  await tabAction(tabB, 'dock-close-page');
+  await tabAction(tabB, 'dock-toggle-pin');
+  await waitFor(async () => (await settingsValue('pins')).length === 0);
+  check(
+    'an unloaded pin can be removed without reopening it',
+    !(await panel.evaluate(`Boolean(document.querySelector(${JSON.stringify(tabB)}))`)),
+  );
+  await openBookmark(`${base2}/page-b`);
+
   // options page: page limit applies to the open panel
   const optionsTab = await newTab(brave.port, `chrome-extension://${id}/options.html`);
   const optionsTarget = await waitFor(async () => {
@@ -619,15 +674,10 @@ try {
     JSON.stringify({ menuOpen, menuClosed }),
   );
 
-  // address bar: a typed address opens in the panel, other text searches the list
+  // Use the real panel navigation, with the search host blocked for this offline suite.
   await reset();
   const typed = `${server.base}/typed?x=1`;
-  await panel.evaluate(`(() => {
-    const address = document.getElementById('address');
-    address.focus();
-    address.value = ${JSON.stringify(typed.replace(/^http:\/\//, ''))};
-    address.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  })()`);
+  await submitAddress(typed.replace(/^http:\/\//, ''));
   await waitFor(async () => (await title()) === '/typed', { timeout: 5000 }).catch(() => {});
   check(
     'address bar opens a typed address',
@@ -636,38 +686,38 @@ try {
       !(await panel.evaluate('document.body.classList.contains("list")')),
     `title=${await title()}`,
   );
-  await panel.evaluate(`(() => {
-    const address = document.getElementById('address');
-    address.focus();
-    address.value = 'SecFetch';
-    address.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  })()`);
-  await sleep(500);
+  await submitAddress('SecFetch');
   check(
-    'address bar searches the list for other text',
+    'address bar opens web search results in the panel',
     await panel.evaluate(
-      `document.body.classList.contains('list') && document.getElementById('q').value === 'SecFetch' &&
-        [...document.querySelectorAll('#tree .bm')].some((a) => a.textContent === 'SecFetch')`,
+      `!document.body.classList.contains('list') &&
+        document.querySelector('#frames iframe:not([hidden])').src === 'https://www.bing.com/search?q=SecFetch'`,
     ),
   );
+  await ensureList(true);
+  await search('tab & 日本語');
+  await panel.evaluate("document.getElementById('web-search').click()");
+  check(
+    'the bookmark list offers an explicit Bing search',
+    await panel.evaluate(
+      `!document.body.classList.contains('list') &&
+      new URL(document.querySelector('#frames iframe:not([hidden])').src).searchParams.get('q') === 'tab & 日本語'`,
+    ),
+  );
+  await ensureList(true);
   await search('');
   await sleep(300);
 
   // open browser tabs are listed and open in the panel
   const tabUrl = `${server.base}/tab-source`;
   const browserTab = await newTab(brave.port, tabUrl);
-  await waitFor(
-    () =>
-      panel.evaluate(
-        `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)})`,
-      ),
-    { timeout: 5000 },
-  ).catch(() => {});
+  const listedTab = () =>
+    panel.evaluate(
+      `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)} && a.textContent === '/tab-source')`,
+    );
   check(
     'list shows open browser tabs',
-    await panel.evaluate(
-      `[...document.querySelectorAll('#tree .bm.tab')].some((a) => a.href === ${JSON.stringify(tabUrl)} && a.textContent === '/tab-source')`,
-    ),
+    await waitFor(listedTab, { timeout: 5000 }).catch(() => false),
   );
   await search('tab-source');
   await sleep(500);
@@ -682,6 +732,7 @@ try {
   );
   await waitFor(async () => (await title()) === '/tab-source', { timeout: 5000 }).catch(() => {});
   check('clicking a tab opens it in the panel', (await title()) === '/tab-source');
+
   await closeTarget(brave.port, browserTab.id);
   await search('');
 
@@ -831,6 +882,96 @@ try {
   check(
     'language switches back to English',
     (await panel.evaluate('document.documentElement.lang')) === 'en',
+  );
+
+  // The active browser tab belongs to this panel's window even if another window has focus.
+  const exactUrl = `${tabUrl}?view=2#section`;
+  const source = await panel.evaluate(
+    `chrome.tabs.create({ active: true, url: ${JSON.stringify(exactUrl)} })`,
+  );
+  await waitFor(() =>
+    panel.evaluate(
+      `chrome.tabs.get(${source.id}).then(tab => tab.url === ${JSON.stringify(exactUrl)})`,
+    ),
+  );
+  const otherWindow = await panel.evaluate(
+    `chrome.windows.create({ url: ${JSON.stringify(`${base2}/other-window`)}, focused: true })`,
+  );
+  await ensureList(true);
+  await panel.evaluate("document.getElementById('current-tab').click()");
+  await waitFor(() =>
+    panel.evaluate(
+      `document.getElementById('address').title === ${JSON.stringify(exactUrl)} && !document.body.classList.contains('list')`,
+    ),
+  );
+  check(
+    'current tab opens at the exact URL and the source tab stays open',
+    await panel.evaluate(
+      `chrome.tabs.get(${source.id}).then(tab => tab.url === ${JSON.stringify(exactUrl)} && tab.active)`,
+    ),
+  );
+
+  const blankTab = await panel.evaluate(
+    `chrome.tabs.create({ windowId: ${source.windowId}, active: true, url: 'about:blank' })`,
+  );
+  await panel.evaluate(
+    "document.getElementById('overflow').click(); document.getElementById('menu-current-tab').click()",
+  );
+  await waitFor(() => panel.evaluate("!document.getElementById('action-error').hidden"));
+  check(
+    'a restricted browser tab leaves the panel page available',
+    (await panel.evaluate("document.getElementById('address').title")) === exactUrl,
+  );
+  await panel.evaluate(`chrome.tabs.remove(${blankTab.id})`);
+
+  await submitAddress(`${server.base}/spa`);
+  await waitFor(async () => (await title()) === 'SPA Next');
+  const movedUrl = `${server.base}/spa/next`;
+  const browserCopies = () =>
+    panel.evaluate(`chrome.tabs.query({ windowId: ${source.windowId} })
+    .then(tabs => tabs.filter(tab => tab.url === ${JSON.stringify(movedUrl)}))`);
+  await panel.evaluate(
+    "document.getElementById('overflow').click(); document.getElementById('popout').click()",
+  );
+  await waitFor(async () => (await browserCopies()).length === 1);
+  check(
+    'opening a copy keeps the tracked panel page',
+    (await panel.evaluate("document.getElementById('address').title")) === movedUrl,
+  );
+  const keptOnError = await panel.evaluate(`(async () => {
+    const create = chrome.tabs.create;
+    try {
+      chrome.tabs.create = async () => { throw new Error('Test window closed'); };
+      document.getElementById('move-to-tab').click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      return !document.getElementById('action-error').hidden &&
+        !document.getElementById('move-to-tab').disabled &&
+        document.getElementById('address').title === ${JSON.stringify(movedUrl)};
+    } finally {
+      chrome.tabs.create = create;
+    }
+  })()`);
+  check('failed move keeps the panel page and allows a retry', keptOnError);
+  await patchSettings({ maxPages: 1 });
+  await panel.evaluate(
+    "document.getElementById('move-to-tab').click(); document.getElementById('move-to-tab').click()",
+  );
+  await waitFor(async () => (await browserCopies()).length === 2);
+  check(
+    'move opens the latest panel URL once in a new foreground tab of the same window',
+    (await browserCopies()).some((tab) => tab.active) &&
+      !(await panel.evaluate(
+        `Boolean(document.querySelector('#dock [data-url="${movedUrl}"][data-alive]'))`,
+      )),
+  );
+  const createdTabs = (await browserCopies()).map((tab) => tab.id);
+  await panel.evaluate(`chrome.tabs.remove(${JSON.stringify([...createdTabs, source.id])})`);
+  await panel.evaluate(`chrome.windows.remove(${otherWindow.id})`);
+  check(
+    'moving the last page returns to the list',
+    await panel.evaluate(
+      "document.body.classList.contains('list') && document.getElementById('move-to-tab').disabled && !document.querySelector('#frames iframe')",
+    ),
   );
 
   check('no uncaught errors in the side panel', errors.length === 0, errors.join(' | '));

@@ -3,7 +3,7 @@ import { createCookieBridge } from './cookies.js';
 import { createDock } from './dock.js';
 import { getLang, LANGS, setLang, t } from './i18n.js';
 import { watchPanelFrames } from './net.js';
-import { normalizeSettings, setSettings, writeLocal } from './store.js';
+import { MAX_PINS, normalizeSettings, reorderPins, setSettings, writeLocal } from './store.js';
 import { displayUrl, hostOf, matchPin } from './urls.js';
 import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from './zoom.js';
 
@@ -23,7 +23,7 @@ function isLoginHost(host) {
   return LOGIN_HOSTS.some((login) => host === login || host.endsWith(`.${login}`));
 }
 
-export function createViewer({ settings: initialSettings, onListShown, onLanguageChange }) {
+export function createViewer({ settings: initialSettings, tabs, onListShown, onLanguageChange }) {
   const frames = document.getElementById('frames');
   const q = document.getElementById('q');
   const pin = document.getElementById('pin');
@@ -37,6 +37,9 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   const fwd = document.getElementById('fwd');
   const reload = document.getElementById('reload');
   const popout = document.getElementById('popout');
+  const moveToTab = document.getElementById('move-to-tab');
+  const closeTab = document.getElementById('menu-close-page');
+  const actionError = document.getElementById('action-error');
   const ua = document.getElementById('ua');
   const langButton = document.getElementById('lang');
   const langValue = document.getElementById('lang-value');
@@ -83,12 +86,6 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   const address = createAddressBar({
     input: document.getElementById('address'),
     onOpen: (url) => openUrl(url, '', { force: true }),
-    // URL でなければブックマークとタブを検索する
-    onSearch(text) {
-      q.value = text;
-      q.dispatchEvent(new Event('input'));
-      showList(true);
-    },
   });
 
   const dock = createDock({
@@ -99,12 +96,10 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     },
     onOpenPin: (item) => openUrl(item.url, item.name),
     onClosePage: closePage,
+    onTogglePin: togglePin,
     onNewTab: () => showList(true),
     async onMovePin(from, to) {
-      const pins = [...settings.pins];
-      const [moved] = pins.splice(from, 1);
-      pins.splice(to, 0, moved);
-      settings = await setSettings({ pins });
+      settings = await setSettings(({ pins }) => ({ pins: reorderPins(pins, from, to) }));
       updateDock();
     },
   });
@@ -143,6 +138,8 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
     fwd.disabled = !page?.canGoForward;
     reload.disabled = !page;
     popout.disabled = !page;
+    moveToTab.disabled = !page || page.moving;
+    closeTab.disabled = !page;
     ua.hidden = !page || !settings.mobileUA;
     ua.disabled = ua.hidden;
     if (page) {
@@ -153,7 +150,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
       ua.setAttribute('aria-label', label);
     }
     const pinned = Boolean(page && matchPin(settings.pins, page.url));
-    pin.disabled = !page;
+    pin.disabled = !page || (!pinned && settings.pins.length >= MAX_PINS);
     pin.setAttribute('aria-pressed', String(pinned));
     pin.title = t(pinned ? 'pin.remove' : 'pin.add');
     pin.setAttribute('aria-label', pin.title);
@@ -241,6 +238,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   }
 
   function setActive(page) {
+    actionError.hidden = true;
     activeId = page.id;
     page.lastUsed = ++clock;
     for (const other of pages.values()) other.iframe.hidden = other !== page;
@@ -401,6 +399,7 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
 
   function showList(on) {
     if (!active()) on = true;
+    actionError.hidden = true;
     document.body.classList.toggle('list', on);
     updateToolbar();
     updateDock();
@@ -517,17 +516,24 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
 
   menu.addEventListener('click', toggleList);
 
-  pin.addEventListener('click', async () => {
-    const page = active();
-    if (!page) return;
-    const current = matchPin(settings.pins, page.url);
-    const pins = current
-      ? settings.pins.filter((item) => item !== current)
-      : [...settings.pins, { url: page.url, name: page.title || page.name || hostOf(page.url) }];
-    settings = await setSettings({ pins });
+  async function togglePin(page, current) {
+    if (!current && !page) return;
+    const pin = current ?? { url: page.url, name: pageText(page) };
+    settings = await setSettings(({ pins }) => {
+      if (current) return { pins: pins.filter((item) => item.url !== pin.url) };
+      if (pins.length >= MAX_PINS || matchPin(pins, pin.url)) return {};
+      return { pins: [...pins, pin] };
+    });
     updateToolbar();
     updateDock();
-    announce(t(current ? 'pin.removed' : 'pin.added'));
+    if (current || matchPin(settings.pins, pin.url)) {
+      announce(t(current ? 'pin.removed' : 'pin.added'));
+    }
+  }
+
+  pin.addEventListener('click', () => {
+    const page = active();
+    if (page) togglePin(page, matchPin(settings.pins, page.url));
   });
 
   const openOptions = () => chrome.runtime.openOptionsPage().catch(() => {});
@@ -558,16 +564,51 @@ export function createViewer({ settings: initialSettings, onListShown, onLanguag
   back.addEventListener('click', () => command('back'));
   fwd.addEventListener('click', () => command('forward'));
   reload.addEventListener('click', reloadActive);
-  popout.addEventListener('click', () => {
+  function showActionError(key) {
+    actionError.dataset.i18n = key;
+    actionError.textContent = t(key);
+    actionError.hidden = false;
+  }
+
+  async function openCurrentTab() {
+    closeMenu();
+    const tab = await tabs.current();
+    if (tab) openUrl(tab.url, tab.title, { force: true });
+    else showActionError('tab.unavailable');
+  }
+  document.getElementById('current-tab').addEventListener('click', openCurrentTab);
+  document.getElementById('menu-current-tab').addEventListener('click', openCurrentTab);
+  closeTab.addEventListener('click', () => {
     closeMenu();
     const page = active();
-    if (page) chrome.tabs.create({ url: page.url }).catch(() => {});
+    if (page) closePage(page);
   });
 
-  noticeOpen.addEventListener('click', () => {
+  async function openInBrowser(move) {
+    closeMenu();
     const page = active();
-    if (page) chrome.tabs.create({ url: page.url }).catch(() => {});
-  });
+    if (!page || page.moving) return;
+    const url = page.url;
+    actionError.hidden = true;
+    if (move) {
+      page.moving = true;
+      updateToolbar();
+    }
+    try {
+      await tabs.open(url);
+      if (move && pages.has(page.id) && page.url === url) closePage(page);
+    } catch {
+      showActionError('tab.openFailed');
+    } finally {
+      if (move) {
+        page.moving = false;
+        updateToolbar();
+      }
+    }
+  }
+  moveToTab.addEventListener('click', () => openInBrowser(true));
+  popout.addEventListener('click', () => openInBrowser(false));
+  noticeOpen.addEventListener('click', () => openInBrowser(false));
   noticeClose.addEventListener('click', () => {
     const page = active();
     if (page) clearNotice(page);

@@ -11,14 +11,14 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 
 - Open/close the side panel from the toolbar button, or toggle the list with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>
 - Browse bookmarks as a folder tree (open/closed state is remembered)
-- The tabs open in the current window are listed above the bookmarks, so a tab can be opened in the panel too. Ctrl / Cmd / Shift / middle click switches to that tab instead
+- Choose **Open current browser tab in panel** from the list or ⋯ to open the active tab's URL beside it. The list also shows the other tabs in that window. Ctrl / Cmd / Shift / middle click on a listed tab switches to it
 - Search bookmarks and open tabs (Enter opens the first match, or the typed address when nothing matches; "Show more" reveals the rest)
 - Open a bookmark in the panel; Ctrl / Cmd / Shift / middle click still opens a normal tab
-- Toolbar: ☰ list (✕ while the list is open), ‹ › back/forward, ⟳ reload, address bar, 📌 pin, 📱/🖥 layout, ⋯ menu (zoom, open the page in a tab, language, settings)
+- Use ↗ in the toolbar to move the displayed page to a new browser tab. The panel tab closes once the browser opens the URL. To keep both, choose **Open a copy in a new browser tab** from ⋯
 - Zoom pages in the panel like browser zoom (50–200%): − / + in the ⋯ menu, or <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd> while the panel has focus. The zoom is remembered per site; the default zoom is in Settings
-- Address bar: shows the page's URL; click it (or press <kbd>Ctrl</kbd>+<kbd>L</kbd> / <kbd>Alt</kbd>+<kbd>D</kbd>) to edit the URL. Enter opens an address such as `example.com` in the panel; other text searches bookmarks and tabs
+- Enter a URL or search Bing from the address bar (<kbd>Ctrl</kbd>+<kbd>L</kbd> or <kbd>Alt</kbd>+<kbd>D</kbd>). Results open in the panel. The bookmark list also offers a **Search Bing** button for the words you enter
 - Tab strip under the toolbar, like a browser: each open page is a tab with its favicon, title and ✕ (middle click closes too), and + opens the list to pick another page
-- Pin sites like the Edge sidebar: pinned sites sit as icon-only tabs at the left of the strip, like pinned tabs in Chrome; a dot marks the ones that are loaded. Drag them to reorder
+- Right-click a panel tab to pin, unpin or close it. With the tab focused, <kbd>Shift</kbd>+<kbd>F10</kbd> opens the same menu. Closing a pinned page keeps its shortcut on the left. Click the pin to reopen it, or drag it to reorder
 - Choose what the panel shows when it opens: the last page, bookmarks and tabs, or a specific page (like a home page)
 - Mobile layout by default: a mobile UA, Client Hints, and `navigator.userAgent` are used to fit the narrow panel
   - Toggle 🖥/📱 per site; the choice is remembered
@@ -65,7 +65,7 @@ The mobile UA is never sent to Cloudflare's challenge frame (`challenges.cloudfl
 | `webRequest` | Observe the current frame URLs, HTTP failures and the original embedding headers (read-only) |
 | `cookies` | Give panel frames the same non-HttpOnly view of `document.cookie` as a normal tab |
 
-The extension itself has no runtime dependencies, no build step, no analytics and no remote code. Nothing leaves your browser; see the [privacy policy](docs/PRIVACY.md).
+Bookmark and tab filtering runs locally. Submitting a web search sends the search terms to Bing. [Privacy policy](docs/PRIVACY.md)
 
 ## Limitations
 

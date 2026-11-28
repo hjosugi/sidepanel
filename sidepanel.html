@@ -15,12 +15,13 @@
   <button id="back" disabled data-i18n-title="back.label" data-i18n-aria-label="back.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg></button>
   <button id="fwd" disabled data-i18n-title="forward.label" data-i18n-aria-label="forward.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></button>
   <button id="reload" disabled data-i18n-title="reload.label" data-i18n-aria-label="reload.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.46-3.54M13 2.5v3h-3"/></svg></button>
-  <input id="address" type="text" inputmode="url" autocomplete="off" spellcheck="false" enterkeyhint="go" data-i18n-placeholder="address.placeholder" data-i18n-aria-label="address.label">
+  <input id="address" type="text" autocomplete="off" spellcheck="false" enterkeyhint="go" data-i18n-placeholder="address.placeholder" data-i18n-aria-label="address.label">
   <button id="pin" disabled aria-pressed="false" data-i18n-title="pin.add" data-i18n-aria-label="pin.add"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2 14 6.5l-1.5.5-2.5 2.5.5 3-1 1-7-7 1-1 3 .5L9 3.5z"/><path d="m2.5 13.5 3-3"/></svg></button>
   <button id="ua" disabled hidden data-mode="mobile" data-i18n-title="mobile.label" data-i18n-aria-label="mobile.label">
     <svg class="phone" aria-hidden="true" viewBox="0 0 16 16"><rect x="4.5" y="1.5" width="7" height="13" rx="1.5"/><path d="M7 12.5h2"/></svg>
     <svg class="desktop" aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="9" rx="1"/><path d="M5.5 14h5M8 11.5V14"/></svg>
   </button>
+  <button id="move-to-tab" disabled data-i18n-title="tab.move" data-i18n-aria-label="tab.move"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7m0-4.5-6 6M12 9.5v4h-9.5V4h4"/></svg></button>
   <button id="overflow" popovertarget="overflow-menu" aria-haspopup="true" aria-expanded="false" data-i18n-title="more.label" data-i18n-aria-label="more.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 3.5h.01M8 8h.01M8 12.5h.01" stroke-width="2.5"/></svg></button>
 </header>
 <div id="overflow-menu" popover data-i18n-aria-label="more.label" role="group">
@@ -30,12 +31,19 @@
     <button id="zoom-reset" disabled class="menu-value">100%</button>
     <button id="zoom-in" disabled data-i18n-title="zoom.in" data-i18n-aria-label="zoom.in"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
   </div>
-  <button id="popout" class="menu-item" disabled data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg><span data-i18n="popout.label"></span></button>
+  <button id="menu-current-tab" class="menu-item"><svg aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M9.5 3v10M3.5 8h4m-2-2 2 2-2 2"/></svg><span data-i18n="tab.import"></span></button>
+  <button id="popout" class="menu-item" disabled data-i18n-aria-label="popout.label"><svg aria-hidden="true" viewBox="0 0 16 16"><rect x="5.5" y="2.5" width="8" height="9" rx="1.5"/><path d="M3 5v8.5h8"/></svg><span data-i18n="popout.label"></span></button>
+  <button id="menu-close-page" class="menu-item" disabled><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg><span data-i18n="tab.close"></span></button>
   <button id="lang" class="menu-item" aria-label="言語 / Language"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c-2 2-2 9 0 11M8 2.5c2 2 2 9 0 11"/></svg><span>言語 / Language</span><span id="lang-value" class="menu-value">EN</span></button>
   <button id="menu-settings" class="menu-item"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></svg><span data-i18n="settings.label"></span></button>
 </div>
 <div id="dock" role="group" hidden data-i18n-aria-label="dock.label"></div>
+<div id="dock-menu" popover role="menu" data-i18n-aria-label="tab.actions">
+  <button id="dock-toggle-pin" class="menu-item" role="menuitem"></button>
+  <button id="dock-close-page" class="menu-item" role="menuitem" data-i18n="tab.close"></button>
+</div>
 <div id="progress" aria-hidden="true"></div>
+<p id="action-error" hidden role="status"></p>
 <div id="notice" hidden role="status" aria-live="polite">
   <span id="notice-text"></span>
   <button id="notice-desktop" type="button" hidden data-i18n="notice.desktop"></button>
@@ -48,6 +56,10 @@
     <div id="search">
       <input id="q" type="search" autocomplete="off" spellcheck="false" data-i18n-placeholder="search.placeholder" data-i18n-aria-label="search.placeholder">
       <button id="settings" type="button" data-i18n-title="settings.label" data-i18n-aria-label="settings.label"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></svg></button>
+    </div>
+    <div id="list-actions">
+      <button id="current-tab" class="menu-item"><svg aria-hidden="true" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M9.5 3v10M3.5 8h4m-2-2 2 2-2 2"/></svg><span data-i18n="tab.import"></span></button>
+      <button id="web-search" class="menu-item" hidden><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4.5"/><path d="m10 10 4 4"/></svg><span></span></button>
     </div>
     <div id="list-body">
       <div id="tree" role="tree"></div>
