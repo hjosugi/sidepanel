@@ -1,7 +1,7 @@
 import {
   Cdp,
   closeTarget,
-  extensionId,
+  extensionUrls,
   launchBrave,
   listTargets,
   newTab,
@@ -61,8 +61,8 @@ async function snapshot() {
 }
 
 try {
-  const id = await extensionId(brave.port);
-  const launcher = await newTab(brave.port, `chrome-extension://${id}/sidepanel.html`);
+  const urls = await extensionUrls(brave.port);
+  const launcher = await newTab(brave.port, urls.panel);
   const launcherTarget = await waitFor(async () => {
     const target = (await listTargets(brave.port)).find((item) => item.id === launcher.id);
     return target?.url.startsWith('chrome-extension://') && target.webSocketDebuggerUrl
@@ -76,11 +76,7 @@ try {
   );
   const panelTarget = await waitFor(async () => {
     const list = await listTargets(brave.port);
-    return (
-      list.find(
-        (t) => t.url === `chrome-extension://${id}/sidepanel.html` && t.id !== launcher.id,
-      ) ?? null
-    );
+    return list.find((t) => t.url === urls.panel && t.id !== launcher.id) ?? null;
   });
   panel = await Cdp.connect(panelTarget.webSocketDebuggerUrl);
   await waitFor(() => panel.evaluate('Boolean(document.getElementById("tree"))'));

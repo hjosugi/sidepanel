@@ -1,11 +1,17 @@
+import { getLang, LANGS, setLang, t } from '../shared/i18n.js';
+import {
+  MAX_PINS,
+  normalizeSettings,
+  reorderPins,
+  setSettings,
+  writeLocal,
+} from '../shared/store.js';
+import { displayUrl, hostOf, matchPin } from '../shared/urls.js';
+import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from '../shared/zoom.js';
 import { createAddressBar } from './address.js';
 import { createCookieBridge } from './cookies.js';
 import { createDock } from './dock.js';
-import { getLang, LANGS, setLang, t } from './i18n.js';
 import { watchPanelFrames } from './net.js';
-import { MAX_PINS, normalizeSettings, reorderPins, setSettings, writeLocal } from './store.js';
-import { displayUrl, hostOf, matchPin } from './urls.js';
-import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from './zoom.js';
 
 const LOGIN_HOSTS = [
   'accounts.google.com',

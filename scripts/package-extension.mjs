@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { PACKAGE_FILES } from './package-files.mjs';
 
@@ -25,7 +25,7 @@ function walk(file) {
   if (statSync(full).isDirectory()) {
     return readdirSync(full)
       .sort()
-      .flatMap((name) => walk(join(file, name)));
+      .flatMap((name) => walk(posix.join(file, name)));
   }
   return [file];
 }

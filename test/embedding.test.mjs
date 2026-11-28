@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blocksEmbedding } from '../embedding.js';
+import { blocksEmbedding } from '../src/sidepanel/embedding.js';
 
 const frame = 'https://bank.example/login';
 const check = (initiator, ...headers) =>

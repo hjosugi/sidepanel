@@ -1,6 +1,7 @@
-import { t } from './i18n.js';
-import { readLocal, writeLocal } from './store.js';
-import { iconSources, toUrl, webSearchUrl } from './urls.js';
+import { t } from '../shared/i18n.js';
+import { readLocal, writeLocal } from '../shared/store.js';
+import { iconSources, toUrl, webSearchUrl } from '../shared/urls.js';
+import { createTreeNavigation } from './tree-navigation.js';
 
 const SEARCH_PAGE = 200;
 // 開いているタブのフォルダ。ブックマークの ID は数字なので重ならない
@@ -14,12 +15,13 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
   const status = document.getElementById('status');
   const bmTemplate = document.getElementById('bm-template');
   const folderTemplate = document.getElementById('folder-template');
+  const navigation = createTreeNavigation(tree, q);
 
   const expanded = new Set((readLocal('open', ['1']) ?? ['1']).map(String));
-  let dirty = false;
+  let dirty = true;
   let renderSeq = 0;
-  let searchState = null;
-  let rootCache = new Map();
+  let renderedQuery = '';
+  const rootCache = new Map();
   let timer;
   let tabsTimer;
   let tabsOpen = readLocal('tabsOpen', true) !== false;
@@ -39,17 +41,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     if (node.url) {
       const a = bmTemplate.content.firstElementChild.cloneNode(true);
       a.dataset.id = node.id;
-      a.querySelector('span').textContent = node.title || node.url;
-      Object.assign(a.querySelector('img'), iconSources(node.url));
-      if (/^javascript:/i.test(node.url)) {
-        a.removeAttribute('href');
-        a.classList.add('unsupported');
-        a.setAttribute('aria-disabled', 'true');
-        a.title = `${node.title}\n${t('bookmark.unsupported')}`;
-      } else {
-        a.href = node.url;
-        a.title = `${node.title}\n${node.url}`;
-      }
+      updateBookmarkElement(a, node);
       return a;
     }
 
@@ -81,12 +73,13 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
       el.removeAttribute('href');
       el.classList.add('unsupported');
       el.setAttribute('aria-disabled', 'true');
+      el.title = `${node.title}\n${t('bookmark.unsupported')}`;
     } else {
       el.href = node.url;
       el.classList.remove('unsupported');
       el.removeAttribute('aria-disabled');
+      el.title = `${node.title}\n${node.url}`;
     }
-    el.title = `${node.title}\n${node.url}`;
     Object.assign(el.querySelector('img'), iconSources(node.url));
   }
 
@@ -124,19 +117,6 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     return d;
   }
 
-  function rows() {
-    return [...tree.querySelectorAll('summary, .bm')].filter(
-      (el) => !el.classList.contains('unsupported') && el.getClientRects().length,
-    );
-  }
-
-  function resetRoving() {
-    const activeRow = document.activeElement?.closest?.('summary, .bm');
-    for (const el of tree.querySelectorAll('summary, .bm')) el.tabIndex = -1;
-    const target = activeRow && tree.contains(activeRow) ? activeRow : rows()[0];
-    if (target) target.tabIndex = 0;
-  }
-
   function updateEmpty() {
     const hasRows = Boolean(tree.querySelector('summary, .bm'));
     tree.hidden = !hasRows;
@@ -162,7 +142,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     if (!d.isConnected) return;
     d.append(...children.map(item));
     loadOpenFolders(d);
-    resetRoving();
+    navigation.reset();
     updateEmpty();
   }
 
@@ -170,34 +150,52 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     for (const d of root.querySelectorAll('details[open]:not([data-loaded])')) loadFolder(d);
   }
 
-  function renderSearch() {
-    if (!searchState) return;
-    const { hits, tabHits, shown } = searchState;
+  function renderSearch(hits, tabHits) {
+    let shown = Math.min(hits.length, SEARCH_PAGE);
     tree.replaceChildren(
       ...(tabHits.length ? [tabsFolder(tabHits, true)] : []),
       ...hits.slice(0, shown).map(item),
     );
-    if (hits.length > shown) {
-      const more = document.createElement('button');
-      more.id = 'more';
-      more.type = 'button';
+    if (shown === hits.length) return;
+
+    const more = document.createElement('button');
+    more.id = 'more';
+    more.type = 'button';
+    function updateCount() {
       more.textContent = t('search.more', { count: hits.length - shown });
-      more.addEventListener('click', () => {
-        searchState.shown = Math.min(hits.length, searchState.shown + SEARCH_PAGE);
-        renderSearch();
-        resetRoving();
-        updateEmpty();
-      });
-      tree.append(more);
     }
-    updateEmpty();
+    more.addEventListener('click', () => {
+      const next = hits.slice(shown, shown + SEARCH_PAGE).map(item);
+      more.before(...next);
+      shown += next.length;
+      if (shown < hits.length) updateCount();
+      else {
+        if (document.activeElement === more) {
+          next.find((el) => !el.classList.contains('unsupported'))?.focus();
+        }
+        more.remove();
+      }
+      navigation.reset();
+    });
+    updateCount();
+    tree.append(more);
+  }
+
+  async function getRootFolders() {
+    const roots = await chrome.bookmarks.getChildren('0').catch(() => []);
+    return Promise.all(
+      roots.map(async (root) => ({
+        root,
+        children: await chrome.bookmarks.getChildren(root.id).catch(() => []),
+      })),
+    );
   }
 
   async function render() {
     const seq = ++renderSeq;
     const query = q.value.trim();
     const scroll = tree.scrollTop;
-    rootCache = new Map();
+    rootCache.clear();
 
     if (query) {
       const [hits, tabHits] = await Promise.all([
@@ -207,33 +205,26 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
           .catch(() => []),
         tabs.search(query),
       ]);
-      if (seq !== renderSeq) return;
-      searchState = { query, hits, tabHits, shown: Math.min(hits.length, SEARCH_PAGE) };
-      renderSearch();
+      if (seq !== renderSeq || query !== q.value.trim()) return;
+      renderSearch(hits, tabHits);
       announce(t('search.count', { count: hits.length + tabHits.length }));
     } else {
-      searchState = null;
-      let roots = [];
-      try {
-        roots = await chrome.bookmarks.getChildren('0');
-      } catch {
-        roots = [];
+      const [folders, openTabs] = await Promise.all([getRootFolders(), tabs.list()]);
+      if (seq !== renderSeq || q.value.trim()) return;
+      const shown = [];
+      for (const { root, children } of folders) {
+        if (!children.length) continue;
+        rootCache.set(root.id, children);
+        shown.push(item(root));
       }
-      if (seq !== renderSeq) return;
-      const [children, openTabs] = await Promise.all([
-        Promise.all(roots.map((root) => chrome.bookmarks.getChildren(root.id).catch(() => []))),
-        tabs.list(),
-      ]);
-      if (seq !== renderSeq) return;
-      const shown = roots.filter((_root, index) => children[index].length);
-      for (const [index, root] of shown.entries()) rootCache.set(root.id, children[index]);
-      tree.replaceChildren(...(openTabs.length ? [tabsFolder(openTabs)] : []), ...shown.map(item));
+      tree.replaceChildren(...(openTabs.length ? [tabsFolder(openTabs)] : []), ...shown);
       loadOpenFolders();
-      updateEmpty();
     }
 
+    renderedQuery = query;
+    updateEmpty();
     tree.scrollTop = scroll;
-    resetRoving();
+    navigation.reset();
   }
 
   function scheduleRender() {
@@ -268,7 +259,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     if (!openTabs.length) d?.remove();
     else if (d) fillTabsFolder(d, openTabs);
     else tree.prepend(tabsFolder(openTabs));
-    resetRoving();
+    navigation.reset();
     updateEmpty();
   }
 
@@ -305,11 +296,11 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     for (const el of folderChildren(d)) el.remove();
     d.append(...children.map(item));
     loadOpenFolders(d);
-    resetRoving();
+    navigation.reset();
     updateEmpty();
   }
 
-  chrome.bookmarks.onCreated.addListener(async (_id, node) => {
+  chrome.bookmarks.onCreated.addListener((_id, node) => {
     rootCache.clear();
     if (!visible() || q.value.trim()) {
       dirty = true;
@@ -338,7 +329,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     }
     const children = folderChildren(d);
     d.insertBefore(item(node), children[node.index] ?? null);
-    resetRoving();
+    navigation.reset();
     updateEmpty();
   });
 
@@ -359,7 +350,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     const root = removed.closest('#tree > details');
     removed.remove();
     if (root && !root.querySelector('.bm, details')) root.remove();
-    resetRoving();
+    navigation.reset();
     updateEmpty();
   });
 
@@ -381,6 +372,7 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
       el.querySelector('summary span').textContent = node.title || t('bookmark.folder');
     } else {
       updateBookmarkElement(el, node);
+      navigation.reset();
     }
   });
 
@@ -461,59 +453,6 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     tabs.activate(Number(a.dataset.tabId));
   });
 
-  tree.addEventListener('focusin', (event) => {
-    const row = event.target.closest('summary, .bm');
-    if (!row) return;
-    for (const el of tree.querySelectorAll('summary, .bm')) el.tabIndex = -1;
-    row.tabIndex = 0;
-  });
-
-  tree.addEventListener('keydown', (event) => {
-    const row = event.target.closest('summary, .bm');
-    if (!row) return;
-    const list = rows();
-    const index = list.indexOf(row);
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      list[index + 1]?.focus();
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      (list[index - 1] ?? q).focus();
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      list[0]?.focus();
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      list.at(-1)?.focus();
-    } else if (event.key === 'ArrowRight' && row.tagName === 'SUMMARY') {
-      const d = row.parentElement;
-      if (!d.open) {
-        event.preventDefault();
-        d.open = true;
-      } else {
-        event.preventDefault();
-        list[index + 1]?.focus();
-      }
-    } else if (event.key === 'ArrowLeft') {
-      const d =
-        row.tagName === 'SUMMARY' ? row.parentElement : row.parentElement.closest('details');
-      if (row.tagName === 'SUMMARY' && d.open) {
-        event.preventDefault();
-        d.open = false;
-      } else {
-        const parent = d?.parentElement.closest('details');
-        if (parent) {
-          event.preventDefault();
-          parent.querySelector(':scope > summary')?.focus();
-        }
-      }
-    } else if ((event.key === 'Enter' || event.key === ' ') && row.classList.contains('bm')) {
-      event.preventDefault();
-      row.click();
-    }
-  });
-
   function updateWebSearch() {
     const query = q.value.trim();
     webSearch.hidden = !query;
@@ -534,16 +473,16 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
   q.addEventListener('keydown', async (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      rows()[0]?.focus();
+      navigation.firstRow()?.focus();
     } else if (event.key === 'Enter' && !event.isComposing) {
       const query = q.value.trim();
       if (!query) return;
       event.preventDefault();
-      if (searchState?.query !== query) {
+      if (renderedQuery !== query) {
         clearTimeout(timer);
         await render();
       }
-      if (!visible() || q.value.trim() !== query || searchState?.query !== query) return;
+      if (!visible() || q.value.trim() !== query || renderedQuery !== query) return;
       const first = tree.querySelector('.bm:not(.unsupported)');
       // 一致するものがなく、URL として読めるならそのページを開く
       const url = first ? null : toUrl(query);
@@ -555,8 +494,6 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
     }
   });
 
-  render();
-
   return {
     updateWebSearch,
     onListShown() {
@@ -564,19 +501,13 @@ export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
         dirty = false;
         render();
       } else {
-        resetRoving();
+        navigation.reset();
       }
     },
     updateLanguage() {
       updateWebSearch();
       if (visible()) render();
       else dirty = true;
-    },
-    refreshIfDirty() {
-      if (dirty) {
-        dirty = false;
-        render();
-      }
     },
   };
 }

@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DEFAULT_SETTINGS, MAX_PAGES, MAX_PINS, normalizeSettings, reorderPins } from '../store.js';
+import {
+  DEFAULT_SETTINGS,
+  MAX_PAGES,
+  MAX_PINS,
+  normalizeSettings,
+  reorderPins,
+} from '../src/shared/store.js';
 
 test('defaults', () => {
   assert.deepEqual(normalizeSettings(), DEFAULT_SETTINGS);

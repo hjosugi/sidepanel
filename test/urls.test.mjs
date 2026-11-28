@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { addressTarget, matchPin, pageKey, toUrl, webSearchUrl } from '../urls.js';
+import { addressTarget, matchPin, pageKey, toUrl, webSearchUrl } from '../src/shared/urls.js';
 
 test('toUrl adds https to host names', () => {
   assert.equal(toUrl('example.com'), 'https://example.com/');

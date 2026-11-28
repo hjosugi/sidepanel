@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseCookieWrite } from '../cookies.js';
+import { parseCookieWrite } from '../src/sidepanel/cookies.js';
 
 const base = 'https://app.example.com/chat/123';
 const now = Date.parse('2026-01-01T00:00:00Z');

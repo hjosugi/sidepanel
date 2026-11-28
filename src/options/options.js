@@ -1,4 +1,4 @@
-import { getLang, setLang, t } from './i18n.js';
+import { getLang, setLang, t } from '../shared/i18n.js';
 import {
   getSettings,
   MAX_PAGES,
@@ -6,9 +6,9 @@ import {
   readLocal,
   reorderPins,
   setSettings,
-} from './store.js';
-import { displayUrl, hostOf, iconSources, SEARCH_ENGINES, toUrl } from './urls.js';
-import { ZOOM_LEVELS, zoomPercent } from './zoom.js';
+} from '../shared/store.js';
+import { displayUrl, hostOf, iconSources, SEARCH_ENGINES, toUrl } from '../shared/urls.js';
+import { ZOOM_LEVELS, zoomPercent } from '../shared/zoom.js';
 
 const lang = document.getElementById('lang');
 const searchEngine = document.getElementById('search-engine');

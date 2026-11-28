@@ -1,6 +1,6 @@
-import { t } from './i18n.js';
-import { MAX_PINS } from './store.js';
-import { iconSources, matchPin } from './urls.js';
+import { t } from '../shared/i18n.js';
+import { MAX_PINS } from '../shared/store.js';
+import { iconSources, matchPin } from '../shared/urls.js';
 
 const PIN_TYPE = 'application/x-sidepanel-pin';
 

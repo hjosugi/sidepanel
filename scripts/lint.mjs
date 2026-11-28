@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, normalize, relative } from 'node:path';
-import { MESSAGES } from '../i18n.js';
+import { join, posix, relative, sep } from 'node:path';
+import { MESSAGES } from '../src/shared/i18n.js';
 import { PACKAGE_FILES } from './package-files.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
@@ -42,12 +42,14 @@ const shipped = new Set(
       fail(`package file is missing: ${entry}`);
       return [];
     }
-    return statSync(full).isDirectory() ? walk(full).map((file) => relative(root, file)) : [entry];
+    return statSync(full).isDirectory()
+      ? walk(full).map((file) => relative(root, file).split(sep).join('/'))
+      : [entry];
   }),
 );
 
-function requireShipped(from, reference) {
-  const target = normalize(join(dirname(from), reference));
+function requireShipped(from, reference, base = posix.dirname(from)) {
+  const target = posix.join(base, reference);
   if (!shipped.has(target)) fail(`${from} references ${reference}, which is not packaged`);
 }
 
@@ -60,8 +62,10 @@ for (const file of shipped) {
   if (file.endsWith('.js')) {
     const source = read(file);
     for (const [, ref] of source.matchAll(/\bfrom\s+'(\.[^']+)'/g)) requireShipped(file, ref);
-    // registerContentScripts に渡すファイル名など
-    for (const [, ref] of source.matchAll(/'([\w-]+\.js)'/g)) requireShipped(file, ref);
+    // registerContentScripts のパスは、インポートと違い拡張のルートが起点。
+    for (const [, ref] of source.matchAll(/'((?:[\w-]+\/)*[\w-]+\.js)'/g)) {
+      requireShipped(file, ref, '.');
+    }
   }
 }
 

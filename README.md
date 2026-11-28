@@ -83,6 +83,16 @@ Bookmark and tab filtering runs locally. Submitting a web search sends the searc
 
 ## Development
 
+Load the repository root in Chrome. It contains `manifest.json`. The extension source lives under `src/`.
+
+| Directory | Contents |
+| --- | --- |
+| [src/sidepanel/](src/sidepanel/) | Panel UI, bookmark tree, search and tab navigation |
+| [src/options/](src/options/) | Settings page |
+| [src/background/](src/background/) | Service worker and request rules |
+| [src/content/](src/content/) | Content scripts that run in pages |
+| [src/shared/](src/shared/) | Settings storage, translations, URL handling and zoom |
+
 The tooling uses [pnpm](https://pnpm.io/); its version is pinned in `packageManager` in `package.json`.
 
 ```sh

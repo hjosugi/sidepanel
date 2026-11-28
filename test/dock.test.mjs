@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assignPages } from '../dock.js';
+import { assignPages } from '../src/sidepanel/dock.js';
 
 const pins = [
   { url: 'https://a.com/', name: 'A' },

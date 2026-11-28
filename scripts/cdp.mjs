@@ -97,7 +97,7 @@ export async function newTab(port, url) {
 
 // Chrome ships component extensions with their own background.js workers,
 // so ask each worker for its manifest name.
-export async function extensionId(port, name = 'Sidepanel Bookmarks') {
+export async function extensionUrls(port, name = 'Sidepanel Bookmarks') {
   return waitFor(async () => {
     const workers = (await listTargets(port)).filter(
       (item) => item.type === 'service_worker' && item.url.startsWith('chrome-extension://'),
@@ -106,8 +106,15 @@ export async function extensionId(port, name = 'Sidepanel Bookmarks') {
       const cdp = await Cdp.connect(worker.webSocketDebuggerUrl).catch(() => null);
       if (!cdp) continue;
       try {
-        const found = await cdp.evaluate('chrome.runtime.getManifest().name').catch(() => null);
-        if (found === name) return new URL(worker.url).host;
+        const manifest = await cdp.evaluate('chrome.runtime.getManifest()').catch(() => null);
+        if (manifest?.name === name) {
+          const root = new URL('/', worker.url);
+          return {
+            panel: new URL(manifest.side_panel.default_path, root).href,
+            options: new URL(manifest.options_ui.page, root).href,
+            background: worker.url,
+          };
+        }
       } finally {
         cdp.close();
       }

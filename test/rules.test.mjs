@@ -2,7 +2,7 @@ import './chrome-stub.mjs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const { buildRules, RULE_IDS } = await import('../rules.js');
+const { buildRules, RULE_IDS } = await import('../src/background/rules.js');
 
 test('every rule only targets panel frames', () => {
   for (const rule of buildRules()) {

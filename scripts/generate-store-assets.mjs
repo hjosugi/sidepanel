@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import {
   Cdp,
   closeTarget,
-  extensionId,
+  extensionUrls,
   launchBrave,
   listTargets,
   newTab,
@@ -188,7 +188,7 @@ li::before{content:"";position:absolute;left:0;top:11px;width:12px;height:12px;b
 
 try {
   mkdirSync(out, { recursive: true });
-  const id = await extensionId(brave.port);
+  const urls = await extensionUrls(brave.port);
 
   // ファビコンを登録するため、デモページを一度通常タブで開く
   for (const name of Object.keys(DEMOS)) {
@@ -197,11 +197,7 @@ try {
     await closeTarget(brave.port, tab.id);
   }
 
-  const { cdp: panel, id: panelId } = await open(
-    `chrome-extension://${id}/sidepanel.html`,
-    PANEL.width,
-    PANEL.height,
-  );
+  const { cdp: panel, id: panelId } = await open(urls.panel, PANEL.width, PANEL.height);
   await waitFor(() => panel.evaluate('Boolean(document.getElementById("tree"))'));
   await panel.evaluate(`(async () => {
     const make = (parentId, title, url) => chrome.bookmarks.create({ parentId, title, ...(url ? { url } : {}) });

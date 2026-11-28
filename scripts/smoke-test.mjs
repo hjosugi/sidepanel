@@ -1,7 +1,7 @@
 import {
   Cdp,
   closeTarget,
-  extensionId,
+  extensionUrls,
   launchBrave,
   listTargets,
   newTab,
@@ -128,8 +128,8 @@ async function patchSettings(patch) {
 }
 
 try {
-  const id = await extensionId(brave.port);
-  const launcher = await newTab(brave.port, `chrome-extension://${id}/sidepanel.html`);
+  const urls = await extensionUrls(brave.port);
+  const launcher = await newTab(brave.port, urls.panel);
   const launcherTarget = await waitFor(async () => {
     const target = (await listTargets(brave.port)).find((item) => item.id === launcher.id);
     return target?.url.startsWith('chrome-extension://') && target.webSocketDebuggerUrl
@@ -144,12 +144,7 @@ try {
 
   const panelTarget = await waitFor(async () => {
     const list = await listTargets(brave.port);
-    return (
-      list.find(
-        (target) =>
-          target.url === `chrome-extension://${id}/sidepanel.html` && target.id !== launcher.id,
-      ) ?? null
-    );
+    return list.find((target) => target.url === urls.panel && target.id !== launcher.id) ?? null;
   });
   panel = await Cdp.connect(panelTarget.webSocketDebuggerUrl);
   await panel.send('Runtime.enable');
@@ -176,6 +171,27 @@ try {
       `(() => ['menu','back','fwd','reload','pin','address','popout','move-to-tab'].every((id) => document.getElementById(id).getAttribute('aria-label')))()`,
     ),
   );
+
+  // The first root can be empty while a later root has bookmarks.
+  const otherBookmark = await panel.evaluate(`(async () => {
+    const [, other] = await chrome.bookmarks.getChildren('0');
+    return chrome.bookmarks.create({ parentId: other.id, title: 'Other root', url: ${JSON.stringify(server.base)} });
+  })()`);
+  await waitFor(() =>
+    panel.evaluate(`(() => {
+      const folder = document.querySelector('#tree details[data-id="${otherBookmark.parentId}"]');
+      if (!folder) return false;
+      folder.open = true;
+      return true;
+    })()`),
+  );
+  check(
+    'expanding a later root shows its own bookmarks',
+    await waitFor(() =>
+      panel.evaluate(`Boolean(document.querySelector('#tree .bm[data-id="${otherBookmark.id}"]'))`),
+    ),
+  );
+  await panel.evaluate(`chrome.bookmarks.remove(${JSON.stringify(otherBookmark.id)})`);
 
   // #1 Sec-Fetch-Dest rewrite
   await reset();
@@ -454,7 +470,7 @@ try {
   await openBookmark(`${base2}/page-b`);
 
   // options page: page limit applies to the open panel
-  const optionsTab = await newTab(brave.port, `chrome-extension://${id}/options.html`);
+  const optionsTab = await newTab(brave.port, urls.options);
   const optionsTarget = await waitFor(async () => {
     const target = (await listTargets(brave.port)).find((item) => item.id === optionsTab.id);
     return target?.webSocketDebuggerUrl ? target : null;
@@ -622,13 +638,29 @@ try {
     moreCount.includes('400') || moreCount.includes('さらに表示'),
     moreCount,
   );
-  await panel.evaluate(`(() => {
+  const pagination = await panel.evaluate(`(() => {
+    const tree = document.getElementById('tree');
+    const first = tree.querySelector('.bm');
     document.getElementById('more').click();
+    const secondPageCount = tree.querySelectorAll('.bm').length;
+    document.getElementById('more').click();
+    const rows = tree.querySelectorAll('.bm');
+    return {
+      secondPageCount,
+      unique: new Set([...rows].map(row => row.dataset.id)).size,
+      total: rows.length,
+      keptFirst: rows[0] === first,
+      finished: !document.getElementById('more'),
+    };
   })()`);
-  await sleep(300);
   check(
-    '#10 Show more reveals the next page of results',
-    (await panel.evaluate("document.querySelectorAll('#tree .bm').length")) === 400,
+    '#10 Show more appends each page once and keeps existing rows',
+    pagination.secondPageCount === 400 &&
+      pagination.total === 600 &&
+      pagination.unique === 600 &&
+      pagination.keptFirst &&
+      pagination.finished,
+    JSON.stringify(pagination),
   );
   await search('');
   await sleep(700);
@@ -640,27 +672,31 @@ try {
 
   // #14 keyboard navigation
   await ensureList(true);
+  await panel.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   const keyboard = await panel.evaluate(`(() => {
     const tree = document.getElementById('tree');
     const rows = [...tree.querySelectorAll('summary, .bm')].filter((el) => el.getClientRects().length);
     const first = rows[0];
     if (!first) return null;
     first.focus();
-    const before = document.activeElement.textContent;
     first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     return {
-      before,
-      after: document.activeElement.textContent,
+      moved: document.activeElement === rows[1],
       role: tree.getAttribute('role'),
-      tabIndex: first.tabIndex,
+      stops: tree.querySelectorAll('[tabindex="0"]').length,
+      tabIndex: document.activeElement.tabIndex,
     };
   })()`);
+  await panel.send('Emulation.setFocusEmulationEnabled', { enabled: false });
   check(
     '#14 arrow keys move focus inside the tree',
-    keyboard && keyboard.role === 'tree' && keyboard.after !== keyboard.before,
+    keyboard && keyboard.role === 'tree' && keyboard.moved,
     JSON.stringify(keyboard),
   );
-  check('#14 the active row has a roving tabindex', keyboard?.tabIndex === 0);
+  check(
+    '#14 only the active row has a roving tabindex',
+    keyboard?.tabIndex === 0 && keyboard.stops === 1,
+  );
 
   // #15 Esc clears the search, then closes the list
   await search('large-item');
@@ -806,7 +842,7 @@ try {
 
   // startup: a specific page opens when the panel opens
   await patchSettings({ startup: 'url', startUrl: `${server.base}/start` });
-  const startTab = await newTab(brave.port, `chrome-extension://${id}/sidepanel.html`);
+  const startTab = await newTab(brave.port, urls.panel);
   const startTarget = await waitFor(async () => {
     const target = (await listTargets(brave.port)).find((item) => item.id === startTab.id);
     return target?.webSocketDebuggerUrl ? target : null;
@@ -816,6 +852,12 @@ try {
     () => startPage.evaluate("document.querySelector('#frames iframe')?.src ?? null"),
     { timeout: 5000 },
   ).catch(() => null);
+  check(
+    'page startup defers the bookmark tree until the list opens',
+    await startPage.evaluate("document.getElementById('tree').childElementCount === 0"),
+  );
+  await startPage.evaluate("document.getElementById('menu').click()");
+  await waitFor(() => startPage.evaluate("Boolean(document.querySelector('#tree .bm'))"));
   startPage.close();
   await closeTarget(brave.port, startTab.id);
   check('startup opens the chosen page', startSrc === `${server.base}/start`, String(startSrc));
@@ -1028,8 +1070,7 @@ try {
 
   // #7 rules and content scripts only exist while a panel is open
   const worker = (await listTargets(brave.port)).find(
-    (target) =>
-      target.type === 'service_worker' && target.url === `chrome-extension://${id}/background.js`,
+    (target) => target.type === 'service_worker' && target.url === urls.background,
   );
   const sw = await Cdp.connect(worker.webSocketDebuggerUrl);
   const panelState = () =>

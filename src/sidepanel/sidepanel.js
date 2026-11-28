@@ -1,6 +1,5 @@
+import { getSettings, readLocal } from '../shared/store.js';
 import { createBookmarks } from './bookmarks.js';
-import { setLang } from './i18n.js';
-import { getSettings, readLocal } from './store.js';
 import { createTabs } from './tabs.js';
 import { createViewer } from './viewer.js';
 
@@ -18,7 +17,6 @@ const prepared = await Promise.race([
   new Promise((resolve) => setTimeout(() => resolve(null), 5000)),
 ]);
 const settings = prepared?.settings ?? (await getSettings());
-setLang(settings.lang ?? 'en');
 
 let viewer;
 const tabs = createTabs();
@@ -40,7 +38,7 @@ viewer = createViewer({
 const last = readLocal('last', null);
 if (settings.startup === 'url' && settings.startUrl) viewer.openUrl(settings.startUrl);
 else if (settings.startup === 'last' && last?.url) viewer.openUrl(last.url, last.name ?? '');
-else viewer.showList(true);
+if (viewer.isListOpen()) viewer.showList(true);
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type !== 'toggle-list') return;

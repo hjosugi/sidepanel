@@ -82,6 +82,16 @@ Cloudflare のチャレンジ用フレーム（`challenges.cloudflare.com`）に
 
 ## 開発
 
+拡張を読み込むときは、`manifest.json` があるリポジトリのルートを選びます。実装は用途別に `src/` に置いています。
+
+| ディレクトリ | 内容 |
+| --- | --- |
+| [src/sidepanel/](src/sidepanel/) | パネル画面、ブックマーク一覧・検索、タブ操作 |
+| [src/options/](src/options/) | 設定画面 |
+| [src/background/](src/background/) | サービスワーカーとリクエストルール |
+| [src/content/](src/content/) | ページ内で動くコンテンツスクリプト |
+| [src/shared/](src/shared/) | 設定の保存、翻訳、URL、ズームの共通処理 |
+
 開発ツールは [pnpm](https://pnpm.io/) を使います。バージョンは `package.json` の `packageManager` で固定しています。
 
 ```sh

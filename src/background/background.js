@@ -1,5 +1,5 @@
+import { getSettings } from '../shared/store.js';
 import { applyRules, clearRules, RULE_IDS } from './rules.js';
-import { getSettings } from './store.js';
 
 const SCRIPT_IDS = ['tracker', 'spa', 'ua', 'cookie', 'unframe'];
 
@@ -27,14 +27,19 @@ function contentScript(id, file, world, extra = {}) {
 // すべてのスクリプトは location.ancestorOrigins を見て、パネル直下のフレーム以外では何もしない。
 function contentScripts(settings) {
   const scripts = [
-    contentScript('tracker', 'tracker.js', 'ISOLATED'),
-    contentScript('spa', 'spa.js', 'MAIN'),
-    contentScript('cookie', 'cookie-shim.js', 'MAIN'),
+    contentScript('tracker', 'src/content/tracker.js', 'ISOLATED'),
+    contentScript('spa', 'src/content/spa.js', 'MAIN'),
+    contentScript('cookie', 'src/content/cookie-shim.js', 'MAIN'),
   ];
   if (settings.mobileUA) {
     const excludeMatches = hostMatches(settings.desktopHosts);
     scripts.push(
-      contentScript('ua', 'ua.js', 'MAIN', excludeMatches.length ? { excludeMatches } : {}),
+      contentScript(
+        'ua',
+        'src/content/ua.js',
+        'MAIN',
+        excludeMatches.length ? { excludeMatches } : {},
+      ),
     );
   }
   return scripts;
@@ -63,7 +68,7 @@ async function enable() {
   // サイトの指定に問題があっても、ほかのスクリプトは登録されたままにする
   if (settings.unframedHosts.length) {
     await register([
-      contentScript('unframe', 'unframe.js', 'MAIN', {
+      contentScript('unframe', 'src/content/unframe.js', 'MAIN', {
         matches: hostMatches(settings.unframedHosts),
       }),
     ]);

@@ -1,5 +1,5 @@
-import { t } from './i18n.js';
-import { addressTarget, displayUrl } from './urls.js';
+import { t } from '../shared/i18n.js';
+import { addressTarget, displayUrl } from '../shared/urls.js';
 
 /**
  * アドレス欄。ふだんは https:// を省いた URL を、編集中は完全な URL を表示する

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from '../zoom.js';
+import { stepZoom, ZOOM_LEVELS, zoomFor, zoomPercent } from '../src/shared/zoom.js';
 
 test('stepZoom moves one level and stops at the ends', () => {
   assert.equal(stepZoom(1, 1), 1.1);
