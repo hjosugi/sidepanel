@@ -16,7 +16,7 @@ A zero-build Chrome MV3 extension that puts your bookmarks in the side panel and
 - Open a bookmark in the panel; Ctrl / Cmd / Shift / middle click still opens a normal tab
 - Use ↗ in the toolbar to move the displayed page to a new browser tab. The panel tab closes once the browser opens the URL. To keep both, choose **Open a copy in a new browser tab** from ⋯
 - Zoom pages in the panel like browser zoom (50–200%): − / + in the ⋯ menu, or <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>Ctrl</kbd>+<kbd>-</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd> while the panel has focus. The zoom is remembered per site; the default zoom is in Settings
-- Enter a URL or search Bing from the address bar (<kbd>Ctrl</kbd>+<kbd>L</kbd> or <kbd>Alt</kbd>+<kbd>D</kbd>). Results open in the panel. The bookmark list also offers a **Search Bing** button for the words you enter
+- Enter a URL or search Google from the address bar (<kbd>Ctrl</kbd>+<kbd>L</kbd> or <kbd>Alt</kbd>+<kbd>D</kbd>). Results open in the panel. The bookmark list uses the same search engine. To use Bing, select it under **Settings → Web search engine**
 - Tab strip under the toolbar, like a browser: each open page is a tab with its favicon, title and ✕ (middle click closes too), and + opens the list to pick another page
 - Right-click a panel tab to pin, unpin or close it. With the tab focused, <kbd>Shift</kbd>+<kbd>F10</kbd> opens the same menu. Closing a pinned page keeps its shortcut on the left. Click the pin to reopen it, or drag it to reorder
 - Choose what the panel shows when it opens: the last page, bookmarks and tabs, or a specific page (like a home page)
@@ -65,7 +65,7 @@ The mobile UA is never sent to Cloudflare's challenge frame (`challenges.cloudfl
 | `webRequest` | Observe the current frame URLs, HTTP failures and the original embedding headers (read-only) |
 | `cookies` | Give panel frames the same non-HttpOnly view of `document.cookie` as a normal tab |
 
-Bookmark and tab filtering runs locally. Submitting a web search sends the search terms to Bing. [Privacy policy](docs/PRIVACY.md)
+Bookmark and tab filtering runs locally. Submitting a web search sends the search terms to the selected engine. [Privacy policy](docs/PRIVACY.md)
 
 ## Limitations
 

@@ -6,7 +6,7 @@ const SEARCH_PAGE = 200;
 // 開いているタブのフォルダ。ブックマークの ID は数字なので重ならない
 const TABS_ID = 'tabs';
 
-export function createBookmarks({ tabs, onOpen }) {
+export function createBookmarks({ tabs, onOpen, getSearchEngine }) {
   const q = document.getElementById('q');
   const webSearch = document.getElementById('web-search');
   const tree = document.getElementById('tree');
@@ -517,12 +517,15 @@ export function createBookmarks({ tabs, onOpen }) {
   function updateWebSearch() {
     const query = q.value.trim();
     webSearch.hidden = !query;
-    webSearch.querySelector('span').textContent = t('search.web', { query });
+    webSearch.querySelector('span').textContent = t('search.web', {
+      engine: getSearchEngine(),
+      query,
+    });
   }
 
   webSearch.addEventListener('click', () => {
     const query = q.value.trim();
-    if (query) onOpen(webSearchUrl(query), '', { force: true });
+    if (query) onOpen(webSearchUrl(query, getSearchEngine()), '', { force: true });
   });
   q.addEventListener('input', () => {
     updateWebSearch();
@@ -555,6 +558,7 @@ export function createBookmarks({ tabs, onOpen }) {
   render();
 
   return {
+    updateWebSearch,
     onListShown() {
       if (dirty) {
         dirty = false;

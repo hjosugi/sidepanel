@@ -21,7 +21,7 @@ const server = await startServer();
 // EXTENSION_DIR で展開済みの配布 zip を検証できる（CI はこちらを使う）
 const brave = await launchBrave(
   process.env.EXTENSION_DIR ?? new URL('..', import.meta.url).pathname,
-  { extraArgs: ['--host-resolver-rules=MAP www.bing.com ~NOTFOUND'] },
+  { extraArgs: ['--host-resolver-rules=MAP www.google.com ~NOTFOUND, MAP www.bing.com ~NOTFOUND'] },
 );
 let panel;
 let launcherPage;
@@ -461,6 +461,10 @@ try {
   });
   const options = await Cdp.connect(optionsTarget.webSocketDebuggerUrl);
   await waitFor(() => options.evaluate('document.getElementById("pages").options.length === 5'));
+  check(
+    'Google is the default in settings',
+    (await options.evaluate("document.getElementById('search-engine').value")) === 'Google',
+  );
   await options.evaluate(`(() => {
     const pages = document.getElementById('pages');
     pages.value = '1';
@@ -478,6 +482,45 @@ try {
     pages.dispatchEvent(new Event('change'));
   })()`);
   await sleep(300);
+  const selectEngine = (name) =>
+    options.evaluate(`(() => {
+    const select = document.getElementById('search-engine');
+    select.value = ${JSON.stringify(name)};
+    select.dispatchEvent(new Event('change'));
+  })()`);
+  await ensureList(true);
+  await search('tab & 日本語');
+  await selectEngine('Bing');
+  await waitFor(() =>
+    panel.evaluate(
+      "document.getElementById('web-search').textContent.includes('Bing') && document.getElementById('address').placeholder.includes('Bing')",
+    ),
+  );
+  check(
+    'changing the search engine saves the preference and updates the open panel',
+    (await settingsValue('searchEngine')) === 'Bing',
+  );
+  const panelSearchUrl = () =>
+    panel.evaluate("document.querySelector('#frames iframe:not([hidden])')?.src");
+  await panel.evaluate("document.getElementById('web-search').click()");
+  const bingResult = new URL(await panelSearchUrl());
+  check(
+    'the bookmark search button uses the selected engine',
+    bingResult.origin === 'https://www.bing.com' &&
+      bingResult.searchParams.get('q') === 'tab & 日本語',
+  );
+  await submitAddress('another query');
+  check(
+    'the address bar uses the selected engine',
+    (await panelSearchUrl()) === 'https://www.bing.com/search?q=another+query',
+  );
+  await selectEngine('Google');
+  await waitFor(() =>
+    panel.evaluate(
+      "document.getElementById('address').getAttribute('aria-label').includes('Google')",
+    ),
+  );
+  await search('');
   options.close();
   await closeTarget(brave.port, optionsTab.id);
 
@@ -674,7 +717,7 @@ try {
     JSON.stringify({ menuOpen, menuClosed }),
   );
 
-  // Use the real panel navigation, with the search host blocked for this offline suite.
+  // Use the real panel navigation with both search hosts blocked for this offline suite.
   await reset();
   const typed = `${server.base}/typed?x=1`;
   await submitAddress(typed.replace(/^http:\/\//, ''));
@@ -688,19 +731,24 @@ try {
   );
   await submitAddress('SecFetch');
   check(
-    'address bar opens web search results in the panel',
+    'address bar opens Google search results in the panel',
     await panel.evaluate(
       `!document.body.classList.contains('list') &&
-        document.querySelector('#frames iframe:not([hidden])').src === 'https://www.bing.com/search?q=SecFetch'`,
+        document.querySelector('#frames iframe:not([hidden])').src === 'https://www.google.com/search?q=SecFetch'`,
     ),
   );
   await ensureList(true);
   await search('tab & 日本語');
+  check(
+    'the bookmark list identifies Google before submitting the query',
+    await panel.evaluate("document.getElementById('web-search').textContent.includes('Google')"),
+  );
   await panel.evaluate("document.getElementById('web-search').click()");
   check(
-    'the bookmark list offers an explicit Bing search',
+    'the bookmark list opens the same query on Google',
     await panel.evaluate(
       `!document.body.classList.contains('list') &&
+      new URL(document.querySelector('#frames iframe:not([hidden])').src).origin === 'https://www.google.com' &&
       new URL(document.querySelector('#frames iframe:not([hidden])').src).searchParams.get('q') === 'tab & 日本語'`,
     ),
   );
@@ -737,14 +785,16 @@ try {
   await search('');
 
   // sites in unframedHosts see themselves as the top frame; other sites still see the frame
+  const hasFrameCheckResult = async () =>
+    /^(top|framed)\|(top|framed)\|(ok|broken)$/.test(await title());
   await patchSettings({ unframedHosts: ['127.0.0.1'] });
   await addBookmark(`${server.base}/frame-check`, 'Frame check');
   await openBookmark(`${server.base}/frame-check`);
-  await waitFor(async () => (await title()) !== 'pending', { timeout: 5000 }).catch(() => {});
+  await waitFor(hasFrameCheckResult, { timeout: 5000 }).catch(() => {});
   const unframedTitle = await title();
   await addBookmark(`${base2}/frame-check`, 'Frame check 2');
   await openBookmark(`${base2}/frame-check`);
-  await waitFor(async () => (await title()) !== 'pending', { timeout: 5000 }).catch(() => {});
+  await waitFor(hasFrameCheckResult, { timeout: 5000 }).catch(() => {});
   const framedTitle = await title();
   check(
     'unframed site sees itself as the top frame, self still works',

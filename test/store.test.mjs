@@ -7,6 +7,15 @@ test('defaults', () => {
   assert.deepEqual(normalizeSettings('broken'), DEFAULT_SETTINGS);
 });
 
+test('older settings use Google and an explicit Bing preference is retained', () => {
+  const old = normalizeSettings({ lang: 'ja', maxPages: 4 });
+  assert.equal(old.searchEngine, 'Google');
+  assert.equal(old.maxPages, 4);
+  assert.equal(old.lang, 'ja');
+  assert.equal(normalizeSettings({ searchEngine: 'Bing' }).searchEngine, 'Bing');
+  assert.equal(normalizeSettings({ searchEngine: 'https://other.example' }).searchEngine, 'Google');
+});
+
 test('pin reordering uses the saved URLs if another panel added or removed a pin', () => {
   const a = { url: 'https://a.example/' };
   const b = { url: 'https://b.example/' };

@@ -23,7 +23,13 @@ function isLoginHost(host) {
   return LOGIN_HOSTS.some((login) => host === login || host.endsWith(`.${login}`));
 }
 
-export function createViewer({ settings: initialSettings, tabs, onListShown, onLanguageChange }) {
+export function createViewer({
+  settings: initialSettings,
+  tabs,
+  onListShown,
+  onLanguageChange,
+  onSearchEngineChange,
+}) {
   const frames = document.getElementById('frames');
   const q = document.getElementById('q');
   const pin = document.getElementById('pin');
@@ -85,6 +91,7 @@ export function createViewer({ settings: initialSettings, tabs, onListShown, onL
 
   const address = createAddressBar({
     input: document.getElementById('address'),
+    getSearchEngine: () => settings.searchEngine,
     onOpen: (url) => openUrl(url, '', { force: true }),
   });
 
@@ -133,6 +140,7 @@ export function createViewer({ settings: initialSettings, tabs, onListShown, onL
   }
 
   function updateToolbar() {
+    address.updateLabels();
     const page = active();
     back.disabled = !page?.canGoBack;
     fwd.disabled = !page?.canGoForward;
@@ -640,10 +648,13 @@ export function createViewer({ settings: initialSettings, tabs, onListShown, onL
   // オプションページや別ウィンドウのパネルで変わった設定を反映する
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.settings) return;
+    const previousEngine = settings.searchEngine;
     settings = normalizeSettings(changes.settings.newValue);
     if (settings.lang && settings.lang !== getLang()) {
       setLang(settings.lang);
       onLanguageChange?.();
+    } else if (settings.searchEngine !== previousEngine) {
+      onSearchEngineChange?.();
     }
     trimPages(settings.maxPages);
     for (const page of pages.values()) applyZoom(page);

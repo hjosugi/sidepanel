@@ -24,6 +24,7 @@ let viewer;
 const tabs = createTabs();
 const bookmarks = createBookmarks({
   tabs,
+  getSearchEngine: () => viewer.settings.searchEngine,
   onOpen: (url, name, options) => viewer.openUrl(url, name, options),
 });
 
@@ -32,6 +33,7 @@ viewer = createViewer({
   tabs,
   onListShown: () => bookmarks.onListShown(),
   onLanguageChange: () => bookmarks.updateLanguage(),
+  onSearchEngineChange: bookmarks.updateWebSearch,
 });
 
 // ホームページのように、パネルを開いたときに表示するものを設定で選べる

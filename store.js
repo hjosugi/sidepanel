@@ -1,3 +1,4 @@
+import { DEFAULT_SEARCH_ENGINE, SEARCH_ENGINES } from './urls.js';
 import { DEFAULT_ZOOM, isZoomLevel } from './zoom.js';
 
 // 設定はバックグラウンドと共有するため chrome.storage.local、
@@ -7,6 +8,7 @@ import { DEFAULT_ZOOM, isZoomLevel } from './zoom.js';
 const LOCAL = typeof localStorage !== 'undefined' ? localStorage : null;
 
 export const DEFAULT_SETTINGS = {
+  searchEngine: DEFAULT_SEARCH_ENGINE,
   mobileUA: true,
   desktopHosts: [],
   // フレームの中かどうかで表示を変えるサイト。unframe.js を入れる
@@ -78,6 +80,9 @@ export function normalizeSettings(raw) {
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
+    searchEngine: SEARCH_ENGINES.has(saved.searchEngine)
+      ? saved.searchEngine
+      : DEFAULT_SEARCH_ENGINE,
     mobileUA: saved.mobileUA !== false,
     desktopHosts: cleanHosts(saved.desktopHosts),
     // 一度も保存していなければ既定のサイトを使う。空にした場合は空のまま

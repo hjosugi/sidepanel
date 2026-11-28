@@ -36,14 +36,22 @@ test('toUrl rejects search words and other schemes', () => {
   }
 });
 
-test('the address bar keeps URLs and sends search terms as a single Bing query', () => {
+test('the address bar keeps URLs and sends search terms to Google by default', () => {
   assert.equal(addressTarget('example.com/a?b=1#c'), 'https://example.com/a?b=1#c');
   const text = 'site:example.com 日本語 & C++ #1';
   const result = new URL(addressTarget(`  ${text}  `));
-  assert.equal(result.origin + result.pathname, 'https://www.bing.com/search');
+  assert.equal(result.origin + result.pathname, 'https://www.google.com/search');
   assert.deepEqual([...result.searchParams], [['q', text]]);
   assert.equal(result.hash, '');
   assert.equal(webSearchUrl(text), result.href);
+});
+
+test('both search entry points use the selected engine and fall back to Google', () => {
+  for (const search of [addressTarget, webSearchUrl]) {
+    assert.equal(search('a & b', 'Bing'), 'https://www.bing.com/search?q=a+%26+b');
+    assert.equal(search('a & b', 'unknown'), 'https://www.google.com/search?q=a+%26+b');
+  }
+  assert.equal(addressTarget('example.com', 'Bing'), 'https://example.com/');
 });
 
 test('empty input and non-web addresses are not submitted as search terms', () => {

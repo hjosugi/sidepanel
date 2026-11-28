@@ -20,7 +20,7 @@ The extension processes the following data locally in the browser:
 - Cookies of the site open in the side panel (see below)
 - Response headers of side-panel frames, to detect errors and to remove nested
   frames that a site does not allow to be embedded
-- Extension settings: language, mobile layout, number of pages kept open, zoom
+- Extension settings: language, web search engine, mobile layout, number of pages kept open, zoom
   (the default and per site), the page shown when the panel opens, pinned sites
   (URL and name), sites shown in desktop layout, and sites shown as in a normal
   tab
@@ -28,8 +28,9 @@ The extension processes the following data locally in the browser:
 ## Local Processing
 
 The extension filters bookmarks and open tabs on the user's device. It has no
-analytics or advertising. Submitting a web search in the address bar or choosing
-**Search Bing** in the list sends the submitted words directly to Microsoft Bing.
+analytics or advertising. Submitting a web search from the address bar or the
+bookmark list sends the search terms directly to Google by default. If you
+select Bing in Settings, Microsoft Bing receives those searches instead.
 Typing in either field makes no search requests.
 
 Pages opened in the side panel are loaded directly from those sites, exactly as

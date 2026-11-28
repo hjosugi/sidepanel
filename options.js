@@ -7,10 +7,11 @@ import {
   reorderPins,
   setSettings,
 } from './store.js';
-import { displayUrl, hostOf, iconSources, toUrl } from './urls.js';
+import { displayUrl, hostOf, iconSources, SEARCH_ENGINES, toUrl } from './urls.js';
 import { ZOOM_LEVELS, zoomPercent } from './zoom.js';
 
 const lang = document.getElementById('lang');
+const searchEngine = document.getElementById('search-engine');
 const mobile = document.getElementById('mobile');
 const pages = document.getElementById('pages');
 const zoom = document.getElementById('zoom');
@@ -35,6 +36,7 @@ const status = document.getElementById('status');
 
 let settings = await getSettings();
 setLang(settings.lang ?? 'en');
+for (const name of SEARCH_ENGINES.keys()) searchEngine.append(new Option(name, name));
 
 for (let count = 1; count <= MAX_PAGES; count++) {
   pages.append(new Option(String(count), String(count)));
@@ -129,6 +131,7 @@ function renderPins() {
 }
 
 function render() {
+  searchEngine.value = settings.searchEngine;
   document.title = t('options.title');
   lang.value = getLang();
   mobile.checked = settings.mobileUA;
@@ -168,6 +171,7 @@ lang.addEventListener('change', () => {
   save({ lang: getLang() });
 });
 mobile.addEventListener('change', () => save({ mobileUA: mobile.checked }));
+searchEngine.addEventListener('change', () => save({ searchEngine: searchEngine.value }));
 pages.addEventListener('change', () => save({ maxPages: Number(pages.value) }));
 zoom.addEventListener('change', () => save({ zoom: Number(zoom.value) }));
 for (const radio of startups) {

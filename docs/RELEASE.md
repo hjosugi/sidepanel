@@ -157,7 +157,7 @@ One-time work, kept here for audits, re-creation and as the source for listing e
   • Click a bookmark to open the site inside the side panel; Ctrl/Cmd/Shift-click still opens a normal tab
   • Open the current browser tab in the panel, or move the panel page to a new browser tab
   • Right-click a panel tab to pin, unpin or close it
-  • Enter a URL or search Bing in the panel address bar
+  • Enter a URL or search Google in the panel address bar. Select Bing in Settings if you prefer
   • Mobile layout by default so sites fit the narrow panel; switch any site to desktop layout with one click
   • Keep several pages open (3 by default, 1–5 in Settings) and switch between them without reloading
   • Sign-ins and site cookies work like a normal tab
@@ -165,7 +165,7 @@ One-time work, kept here for audits, re-creation and as the source for listing e
   • Keyboard navigation (arrow keys, Home/End, Alt+Shift+B to toggle the list) and screen reader support
   • English and Japanese interface
 
-  Bookmark and tab filtering runs locally. When you submit a web search, Bing receives your search terms.
+  Bookmark and tab filtering runs locally. When you submit a web search, the selected search engine receives your search terms.
 
   How it works: many sites refuse to be shown inside a frame. While the side panel is open, the extension removes those embedding restrictions only for frames inside the side panel. Normal tabs are never changed, and the rules are removed when the last side panel closes.
 
@@ -190,7 +190,7 @@ One-time work, kept here for audits, re-creation and as the source for listing e
   - `cookies: Gives the page open in the side panel the same non-HttpOnly cookies it would see in a normal tab via document.cookie. HttpOnly cookies are never exposed, and a page can only write cookies for its own site.`
   - `Host permission <all_urls>: The user can bookmark and open any site in the side panel, so the header rules, content scripts and cookie access must work for any site.`
 - Remote code: `No, I am not using remote code.`
-- For the data-use disclosures, distinguish local bookmark and tab filtering from user-submitted web searches sent directly to Bing. See the linked privacy policy.
+- For the data-use disclosures, distinguish local bookmark and tab filtering from user-submitted web searches sent directly to the selected provider (Google by default, or Bing). See the linked privacy policy.
 - Privacy policy URL: `https://github.com/hjosugi/sidepanel/blob/main/docs/PRIVACY.md`
 - Test instructions (optional): `Click the toolbar icon to open the side panel, then click any bookmark. The site opens inside the panel. The sliders button next to the search box opens the settings.`
 

@@ -53,14 +53,20 @@ export function toUrl(input) {
   return parseHttp(`${local ? 'http' : 'https'}://${text}`);
 }
 
-export function webSearchUrl(query) {
-  const url = new URL('https://www.bing.com/search');
+export const DEFAULT_SEARCH_ENGINE = 'Google';
+export const SEARCH_ENGINES = new Map([
+  [DEFAULT_SEARCH_ENGINE, 'https://www.google.com/search'],
+  ['Bing', 'https://www.bing.com/search'],
+]);
+
+export function webSearchUrl(query, engine = DEFAULT_SEARCH_ENGINE) {
+  const url = new URL(SEARCH_ENGINES.get(engine) ?? SEARCH_ENGINES.get(DEFAULT_SEARCH_ENGINE));
   url.searchParams.set('q', query.trim());
   return url.href;
 }
 
 /** ブラウザ内部の URL や bookmarklet を誤って外部の検索に送らない。 */
-export function addressTarget(text) {
+export function addressTarget(text, engine) {
   const url = toUrl(text);
   if (url) return url;
   const query = text.trim();
@@ -72,7 +78,7 @@ export function addressTarget(text) {
   ) {
     return null;
   }
-  return webSearchUrl(query);
+  return webSearchUrl(query, engine);
 }
 
 /** 同じページかどうかを比べるキー。末尾の / と # 以降の違いは無視する。 */

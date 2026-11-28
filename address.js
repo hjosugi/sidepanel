@@ -6,7 +6,7 @@ import { addressTarget, displayUrl } from './urls.js';
  * （ページのタイトルはタブに出る）。
  * Enter で Web アドレスまたは検索結果をパネルに開く。
  */
-export function createAddressBar({ input, onOpen }) {
+export function createAddressBar({ input, onOpen, getSearchEngine }) {
   let url = '';
   // クリックで入ったときも全体を選択したままにする（mouseup で選択が解除されるため）
   let keepSelection = false;
@@ -43,7 +43,7 @@ export function createAddressBar({ input, onOpen }) {
     event.preventDefault();
     const text = input.value.trim();
     if (!text) return;
-    const target = addressTarget(text);
+    const target = addressTarget(text, getSearchEngine());
     if (!target) {
       input.setCustomValidity(t('address.unsupported'));
       input.reportValidity();
@@ -54,6 +54,11 @@ export function createAddressBar({ input, onOpen }) {
   });
 
   return {
+    updateLabels() {
+      const engine = getSearchEngine();
+      input.placeholder = t('address.placeholder', { engine });
+      input.setAttribute('aria-label', t('address.label', { engine }));
+    },
     /** 表示中のページの URL。ページがなければ空文字 */
     update(nextUrl) {
       url = nextUrl;
